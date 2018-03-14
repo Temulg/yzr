@@ -9,7 +9,10 @@
 package yzr.base;
 
 public class UnixBootstrap {
-	public static void main() {
-		System.out.println("hururur");
+	public static void main(String... args) {
+		System.out.println("bootstrap");
+		for (String s: args) {
+			System.out.format("arg |%s|\n", s);
+		}
 	}
 }

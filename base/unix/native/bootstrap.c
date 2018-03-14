@@ -7,6 +7,7 @@
  */
 
 #include <jni.h>
+#include <stdio.h>
 
 static char const main_bootstrap_class[] = "yzr/base/UnixBootstrap";
 
@@ -23,7 +24,7 @@ static struct class_data bootstrap[] = {{
 	NULL, NULL, 0
 }};
 
-void load_bootstrap(JNIEnv *env, jobject class_loader) {
+void load_bootstrap(JNIEnv *env, jobject class_loader, jobject args) {
 	jclass main_class = NULL;
 
 	for(struct class_data *cd = &bootstrap[0]; cd->name; cd++) {
@@ -35,8 +36,8 @@ void load_bootstrap(JNIEnv *env, jobject class_loader) {
 	}
 
 	jmethodID main = (*env)->GetStaticMethodID(
-		env, main_class, "main", "()V"
+		env, main_class, "main", "([Ljava/lang/String;)V"
 	);
 
-	(*env)->CallStaticVoidMethod(env, main_class, main);
+	(*env)->CallStaticVoidMethod(env, main_class, main, args);
 }
