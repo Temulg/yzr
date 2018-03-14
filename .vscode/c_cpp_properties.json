@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "/opt/oracle-jdk-bin-9.0.1/include",
+                "/opt/oracle-jdk-bin-9.0.1/include/linux",
+                "/usr/lib64/gcc/x86_64-pc-linux-gnu/7.2.0/include"
+            ],
+            "intelliSenseMode": "clang-x64"
+        }
+    ],
+    "version": 3
+}

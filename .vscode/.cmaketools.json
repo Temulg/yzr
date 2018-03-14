@@ -1,0 +1,509 @@
+{
+  "variant": {
+    "label": "Release",
+    "keywordSettings": {
+      "buildType": "release"
+    },
+    "description": "Enable optimizations, omit debug info"
+  },
+  "activeEnvironments": [],
+  "codeModel": {
+    "configurations": [
+      {
+        "name": "Release",
+        "projects": [
+          {
+            "buildDirectory": "/root/pwork/yzr/build/base/buildtools",
+            "name": "buildtools",
+            "sourceDirectory": "/root/pwork/yzr/base/buildtools",
+            "targets": [
+              {
+                "artifacts": [
+                  "/root/pwork/yzr/build/base/buildtools/bin2cstr"
+                ],
+                "buildDirectory": "/root/pwork/yzr/build/base/buildtools",
+                "crossReferences": {
+                  "backtrace": [
+                    {
+                      "line": 3,
+                      "name": "add_executable",
+                      "path": "/root/pwork/yzr/base/buildtools/CMakeLists.txt"
+                    },
+                    {
+                      "path": "/root/pwork/yzr/base/buildtools/CMakeLists.txt"
+                    }
+                  ],
+                  "relatedStatements": []
+                },
+                "fileGroups": [
+                  {
+                    "compileFlags": "-O3 -DNDEBUG  ",
+                    "isGenerated": false,
+                    "language": "C",
+                    "sources": [
+                      "bin2cstr.c"
+                    ]
+                  }
+                ],
+                "fullName": "bin2cstr",
+                "linkFlags": "-rdynamic",
+                "linkLanguageFlags": "-O3 -DNDEBUG",
+                "linkerLanguage": "C",
+                "name": "bin2cstr",
+                "sourceDirectory": "/root/pwork/yzr/base/buildtools",
+                "type": "EXECUTABLE"
+              }
+            ]
+          },
+          {
+            "buildDirectory": "/root/pwork/yzr/build/base/unix/native",
+            "name": "native",
+            "sourceDirectory": "/root/pwork/yzr/base/unix/native",
+            "targets": [
+              {
+                "artifacts": [
+                  "/root/pwork/yzr/build/base/unix/native/yzr"
+                ],
+                "buildDirectory": "/root/pwork/yzr/build/base/unix/native",
+                "crossReferences": {
+                  "backtrace": [
+                    {
+                      "line": 19,
+                      "name": "add_executable",
+                      "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                    },
+                    {
+                      "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                    }
+                  ],
+                  "relatedStatements": [
+                    {
+                      "backtrace": [
+                        {
+                          "line": 26,
+                          "name": "target_include_directories",
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        },
+                        {
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        }
+                      ],
+                      "type": "target_include_directories"
+                    },
+                    {
+                      "backtrace": [
+                        {
+                          "line": 26,
+                          "name": "target_include_directories",
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        },
+                        {
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        }
+                      ],
+                      "type": "target_include_directories"
+                    },
+                    {
+                      "backtrace": [
+                        {
+                          "line": 26,
+                          "name": "target_include_directories",
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        },
+                        {
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        }
+                      ],
+                      "type": "target_include_directories"
+                    },
+                    {
+                      "backtrace": [
+                        {
+                          "line": 33,
+                          "name": "target_link_libraries",
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        },
+                        {
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        }
+                      ],
+                      "type": "target_link_libraries"
+                    }
+                  ]
+                },
+                "fileGroups": [
+                  {
+                    "isGenerated": true,
+                    "sources": [
+                      "../../../build/base/unix/native/UnixBootstrap_data.h",
+                      "../../../build/base/unix/native/UnixBootstrap_data.h.rule"
+                    ]
+                  },
+                  {
+                    "compileFlags": "-O3 -DNDEBUG  ",
+                    "includePath": [
+                      {
+                        "path": "/root/pwork/yzr/build/base/unix/native"
+                      },
+                      {
+                        "path": "/opt/oracle-jdk-bin-9.0.1/include"
+                      },
+                      {
+                        "path": "/opt/oracle-jdk-bin-9.0.1/include/linux"
+                      }
+                    ],
+                    "isGenerated": false,
+                    "language": "C",
+                    "sources": [
+                      "main.c",
+                      "bootstrap.c"
+                    ]
+                  }
+                ],
+                "fullName": "yzr",
+                "linkFlags": "-rdynamic",
+                "linkLanguageFlags": "-O3 -DNDEBUG",
+                "linkLibraries": "-Wl,-rpath,/opt/oracle-jdk-bin-9.0.1/lib/server: /opt/oracle-jdk-bin-9.0.1/lib/server/libjvm.so",
+                "linkerLanguage": "C",
+                "name": "yzr",
+                "sourceDirectory": "/root/pwork/yzr/base/unix/native",
+                "type": "EXECUTABLE"
+              }
+            ]
+          },
+          {
+            "buildDirectory": "/root/pwork/yzr/build/base/unix",
+            "name": "unix",
+            "sourceDirectory": "/root/pwork/yzr/base/unix",
+            "targets": [
+              {
+                "artifacts": [
+                  "/root/pwork/yzr/build/base/unix/native/yzr"
+                ],
+                "buildDirectory": "/root/pwork/yzr/build/base/unix/native",
+                "crossReferences": {
+                  "backtrace": [
+                    {
+                      "line": 19,
+                      "name": "add_executable",
+                      "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                    },
+                    {
+                      "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                    }
+                  ],
+                  "relatedStatements": [
+                    {
+                      "backtrace": [
+                        {
+                          "line": 26,
+                          "name": "target_include_directories",
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        },
+                        {
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        }
+                      ],
+                      "type": "target_include_directories"
+                    },
+                    {
+                      "backtrace": [
+                        {
+                          "line": 26,
+                          "name": "target_include_directories",
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        },
+                        {
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        }
+                      ],
+                      "type": "target_include_directories"
+                    },
+                    {
+                      "backtrace": [
+                        {
+                          "line": 26,
+                          "name": "target_include_directories",
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        },
+                        {
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        }
+                      ],
+                      "type": "target_include_directories"
+                    },
+                    {
+                      "backtrace": [
+                        {
+                          "line": 33,
+                          "name": "target_link_libraries",
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        },
+                        {
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        }
+                      ],
+                      "type": "target_link_libraries"
+                    }
+                  ]
+                },
+                "fileGroups": [
+                  {
+                    "isGenerated": true,
+                    "sources": [
+                      "../../../build/base/unix/native/UnixBootstrap_data.h",
+                      "../../../build/base/unix/native/UnixBootstrap_data.h.rule"
+                    ]
+                  },
+                  {
+                    "compileFlags": "-O3 -DNDEBUG  ",
+                    "includePath": [
+                      {
+                        "path": "/root/pwork/yzr/build/base/unix/native"
+                      },
+                      {
+                        "path": "/opt/oracle-jdk-bin-9.0.1/include"
+                      },
+                      {
+                        "path": "/opt/oracle-jdk-bin-9.0.1/include/linux"
+                      }
+                    ],
+                    "isGenerated": false,
+                    "language": "C",
+                    "sources": [
+                      "main.c",
+                      "bootstrap.c"
+                    ]
+                  }
+                ],
+                "fullName": "yzr",
+                "linkFlags": "-rdynamic",
+                "linkLanguageFlags": "-O3 -DNDEBUG",
+                "linkLibraries": "-Wl,-rpath,/opt/oracle-jdk-bin-9.0.1/lib/server: /opt/oracle-jdk-bin-9.0.1/lib/server/libjvm.so",
+                "linkerLanguage": "C",
+                "name": "yzr",
+                "sourceDirectory": "/root/pwork/yzr/base/unix/native",
+                "type": "EXECUTABLE"
+              },
+              {
+                "buildDirectory": "/root/pwork/yzr/build/base/unix",
+                "crossReferences": {
+                  "backtrace": [
+                    {
+                      "line": 17,
+                      "name": "add_custom_target",
+                      "path": "/root/pwork/yzr/base/unix/CMakeLists.txt"
+                    },
+                    {
+                      "path": "/root/pwork/yzr/base/unix/CMakeLists.txt"
+                    }
+                  ],
+                  "relatedStatements": []
+                },
+                "fileGroups": [
+                  {
+                    "isGenerated": true,
+                    "sources": [
+                      "../../build/base/unix/CMakeFiles/java_bootstrap",
+                      "../../build/base/unix/CMakeFiles/java_bootstrap.rule",
+                      "../../build/base/unix/yzr/base/UnixBootstrap.class.rule"
+                    ]
+                  }
+                ],
+                "fullName": "java_bootstrap",
+                "name": "java_bootstrap",
+                "sourceDirectory": "/root/pwork/yzr/base/unix",
+                "type": "UTILITY"
+              }
+            ]
+          },
+          {
+            "buildDirectory": "/root/pwork/yzr/build",
+            "name": "yzr",
+            "sourceDirectory": "/root/pwork/yzr",
+            "targets": [
+              {
+                "artifacts": [
+                  "/root/pwork/yzr/build/base/unix/native/yzr"
+                ],
+                "buildDirectory": "/root/pwork/yzr/build/base/unix/native",
+                "crossReferences": {
+                  "backtrace": [
+                    {
+                      "line": 19,
+                      "name": "add_executable",
+                      "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                    },
+                    {
+                      "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                    }
+                  ],
+                  "relatedStatements": [
+                    {
+                      "backtrace": [
+                        {
+                          "line": 26,
+                          "name": "target_include_directories",
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        },
+                        {
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        }
+                      ],
+                      "type": "target_include_directories"
+                    },
+                    {
+                      "backtrace": [
+                        {
+                          "line": 26,
+                          "name": "target_include_directories",
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        },
+                        {
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        }
+                      ],
+                      "type": "target_include_directories"
+                    },
+                    {
+                      "backtrace": [
+                        {
+                          "line": 26,
+                          "name": "target_include_directories",
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        },
+                        {
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        }
+                      ],
+                      "type": "target_include_directories"
+                    },
+                    {
+                      "backtrace": [
+                        {
+                          "line": 33,
+                          "name": "target_link_libraries",
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        },
+                        {
+                          "path": "/root/pwork/yzr/base/unix/native/CMakeLists.txt"
+                        }
+                      ],
+                      "type": "target_link_libraries"
+                    }
+                  ]
+                },
+                "fileGroups": [
+                  {
+                    "isGenerated": true,
+                    "sources": [
+                      "../../../build/base/unix/native/UnixBootstrap_data.h",
+                      "../../../build/base/unix/native/UnixBootstrap_data.h.rule"
+                    ]
+                  },
+                  {
+                    "compileFlags": "-O3 -DNDEBUG  ",
+                    "includePath": [
+                      {
+                        "path": "/root/pwork/yzr/build/base/unix/native"
+                      },
+                      {
+                        "path": "/opt/oracle-jdk-bin-9.0.1/include"
+                      },
+                      {
+                        "path": "/opt/oracle-jdk-bin-9.0.1/include/linux"
+                      }
+                    ],
+                    "isGenerated": false,
+                    "language": "C",
+                    "sources": [
+                      "main.c",
+                      "bootstrap.c"
+                    ]
+                  }
+                ],
+                "fullName": "yzr",
+                "linkFlags": "-rdynamic",
+                "linkLanguageFlags": "-O3 -DNDEBUG",
+                "linkLibraries": "-Wl,-rpath,/opt/oracle-jdk-bin-9.0.1/lib/server: /opt/oracle-jdk-bin-9.0.1/lib/server/libjvm.so",
+                "linkerLanguage": "C",
+                "name": "yzr",
+                "sourceDirectory": "/root/pwork/yzr/base/unix/native",
+                "type": "EXECUTABLE"
+              },
+              {
+                "buildDirectory": "/root/pwork/yzr/build/base/unix",
+                "crossReferences": {
+                  "backtrace": [
+                    {
+                      "line": 17,
+                      "name": "add_custom_target",
+                      "path": "/root/pwork/yzr/base/unix/CMakeLists.txt"
+                    },
+                    {
+                      "path": "/root/pwork/yzr/base/unix/CMakeLists.txt"
+                    }
+                  ],
+                  "relatedStatements": []
+                },
+                "fileGroups": [
+                  {
+                    "isGenerated": true,
+                    "sources": [
+                      "../../build/base/unix/CMakeFiles/java_bootstrap",
+                      "../../build/base/unix/CMakeFiles/java_bootstrap.rule",
+                      "../../build/base/unix/yzr/base/UnixBootstrap.class.rule"
+                    ]
+                  }
+                ],
+                "fullName": "java_bootstrap",
+                "name": "java_bootstrap",
+                "sourceDirectory": "/root/pwork/yzr/base/unix",
+                "type": "UTILITY"
+              },
+              {
+                "artifacts": [
+                  "/root/pwork/yzr/build/base/buildtools/bin2cstr"
+                ],
+                "buildDirectory": "/root/pwork/yzr/build/base/buildtools",
+                "crossReferences": {
+                  "backtrace": [
+                    {
+                      "line": 3,
+                      "name": "add_executable",
+                      "path": "/root/pwork/yzr/base/buildtools/CMakeLists.txt"
+                    },
+                    {
+                      "path": "/root/pwork/yzr/base/buildtools/CMakeLists.txt"
+                    }
+                  ],
+                  "relatedStatements": []
+                },
+                "fileGroups": [
+                  {
+                    "compileFlags": "-O3 -DNDEBUG  ",
+                    "isGenerated": false,
+                    "language": "C",
+                    "sources": [
+                      "bin2cstr.c"
+                    ]
+                  }
+                ],
+                "fullName": "bin2cstr",
+                "linkFlags": "-rdynamic",
+                "linkLanguageFlags": "-O3 -DNDEBUG",
+                "linkerLanguage": "C",
+                "name": "bin2cstr",
+                "sourceDirectory": "/root/pwork/yzr/base/buildtools",
+                "type": "EXECUTABLE"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "cookie": "0.08333331497848717",
+    "inReplyTo": "codemodel",
+    "type": "reply"
+  }
+}
