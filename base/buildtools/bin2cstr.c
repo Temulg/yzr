@@ -1,7 +1,7 @@
 /*
  * Convert binary data into a properly escaped C string.
  *
- * Copyright (C) 2010 Alex Dubov <oakad@yahoo.com>
+ * Copyright (C) 2018 Alex Dubov <oakad@yahoo.com>
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the  terms of  the GNU General Public License version 3 as publi-
@@ -9,67 +9,149 @@
  */
 
 #include <stdio.h>
+#include <unistd.h>
 
-int c2s(char *s_out, int c_in)
-{
+size_t encode_byte(char *line, size_t line_pos, char ch, char next_ch) {
 	const char nc[] = {'a', 'b', 't', 'n', 'v', 'f', 'r'};
 
-	if (c_in >= 7 && c_in < 14) {
-		s_out[0] = '\\';
-		s_out[1] = nc[c_in - 7];
-		s_out[2] = 0;
-		return 2;
-	} else if (c_in >= 32 && c_in < 34) {
-		s_out[0] = c_in;
-		s_out[1] = 0;
-		return 1;
-	} else if (c_in == 34 || c_in == 92) {
-		s_out[0] = '\\';
-		s_out[1] = c_in;
-		s_out[2] = 0;
-		return 2;
-	} else if ((c_in >= 35 && c_in < 92) || (c_in >= 93 && c_in < 127)) {
-		s_out[0] = c_in;
-		s_out[1] = 0;
-		return 1;
+	if (ch >= 0x7 && ch < 0xe) {
+		line[line_pos++] = '\\';
+		line[line_pos++] = nc[ch - 7];
+	} else if (ch == ' ' || ch == '!') {
+		line[line_pos++] = ch;
+	} else if (ch == '\"' || ch == '\\') {
+		line[line_pos++] = '\\';
+		line[line_pos++] = ch;
+	} else if ((ch >= '#' && ch < '\\') || (ch >= ']' && ch < 0x7f)) {
+		line[line_pos++] = ch;
 	} else {
-		s_out[0] = '\\';
-		s_out[1] = (c_in >> 6) | 48;
-		s_out[2] = ((c_in >> 3) & 7) | 48;
-		s_out[3] = (c_in & 7) | 48;
-		s_out[4] = 0;
-		return 4;
+		line[line_pos++] = '\\';
+
+		char d[] = {
+			(ch >> 6) & 3, (ch >> 3) & 7, ch & 7
+		};
+
+		if (d[0] || (next_ch >= '0' && next_ch < '8')) {
+			line[line_pos++] = d[0] | '0';
+			line[line_pos++] = d[1] | '0';
+		} else if (d[1])
+			line[line_pos++] = d[1] | '0';
+
+		line[line_pos++] = d[2] | '0';
 	}
+	return line_pos;
 }
+
+static char buffer_in[4096];
+static char line_buffer_out[80];
 
 int main(int argc, char **argv)
 {
-	int c, l_cnt = 0, c_cnt;
-	size_t b_cnt = 0;
-	char c_out[5];
+	size_t line_pos = 0, byte_count = 0;
+	ssize_t write_count = 0;
 
-	while (EOF != (c = fgetc(stdin))) {
-		if (l_cnt == 0) {
-			fputc('\"', stdout);
-			l_cnt++;
-		}
+	ssize_t count = read(
+		STDIN_FILENO, buffer_in, sizeof(buffer_in)
+	);
 
-		c_cnt = c2s(c_out, c);
-		if ((l_cnt + c_cnt) > 79) {
-			ungetc(c, stdin);
-			fputs("\"\n", stdout);
-			l_cnt = 0;
+	ssize_t in_pos = 0;
+	char char_pair[3];
+	if (count > 2) {
+		char_pair[0] = buffer_in[in_pos++];
+		char_pair[1] = buffer_in[in_pos++];
+		char_pair[2] = 1;
+	} else if (count == 1) {
+		char_pair[0] = buffer_in[in_pos++];
+		char_pair[2] = 0;
+	} else if (count <= 0) {
+		write_count += write(STDIN_FILENO, "\"\", 0", 5);
+		return 0;
+	}
+
+	line_buffer_out[0] = '\"';
+	line_pos = 1;
+
+	while (1) {
+		if (char_pair[2]) {
+			line_pos = encode_byte(
+				line_buffer_out, line_pos, char_pair[0],
+				char_pair[1]
+			);
+			byte_count++;
+
+			if ((sizeof(line_buffer_out) - line_pos) <= 6) {
+				line_buffer_out[line_pos++] = '\"';
+				line_buffer_out[line_pos++] = '\n';
+				write_count += write(
+					STDOUT_FILENO, line_buffer_out,
+					line_pos
+				);
+				line_pos = 1;
+				line_buffer_out[0] = '\"';
+			}
+
+			char_pair[0] = char_pair[1];
+
+			if (in_pos < count)
+				char_pair[1] = buffer_in[in_pos++];
+			else
+				char_pair[2] = 0;
 		} else {
-			fputs(c_out, stdout);
-			l_cnt += c_cnt;
-			b_cnt++;
+			count = read(
+				STDIN_FILENO, buffer_in, sizeof(buffer_in)
+			);
+			if (count <= 0)
+				break;
+
+			in_pos = 0;
+			char_pair[1] = buffer_in[in_pos++];
+			char_pair[2] = 1;
 		}
 	}
-	if (l_cnt)
-		fputs("\"\n", stdout);
 
-	if (b_cnt)
-		printf(", %lu", b_cnt);
+	if ((sizeof(line_buffer_out) - line_pos) <= 6) {
+		line_buffer_out[line_pos++] = '\"';
+		line_buffer_out[line_pos++] = '\n';
+		write_count += write(
+			STDOUT_FILENO, line_buffer_out, line_pos
+		);
+		line_pos = 1;
+		line_buffer_out[0] = '\"';
+	}
+
+	line_pos = encode_byte(line_buffer_out, line_pos, char_pair[0], 0);
+	byte_count++;
+
+	if ((sizeof(line_buffer_out) - line_pos) > 12) {
+		line_buffer_out[line_pos++] = '\"';
+		line_buffer_out[line_pos++] = ',';
+		line_buffer_out[line_pos++] = ' ';
+		line_pos += snprintf(
+			line_buffer_out + line_pos, 
+			sizeof(line_buffer_out) - line_pos,
+			"%lu", byte_count
+		);
+		line_buffer_out[line_pos++] = '\n';
+		write_count += write(
+			STDOUT_FILENO, line_buffer_out, line_pos
+		);
+	} else {
+		line_buffer_out[line_pos++] = '\"';
+		line_buffer_out[line_pos++] = ',';
+		line_buffer_out[line_pos++] = '\n';
+		write_count += write(
+			STDOUT_FILENO, line_buffer_out, line_pos
+		);
+
+		line_pos = snprintf(
+			line_buffer_out, sizeof(line_buffer_out),
+			"%lu", byte_count
+		);
+		line_buffer_out[line_pos++] = '\n';
+		write_count += write(
+			STDOUT_FILENO, line_buffer_out, line_pos
+		);
+	}
 
 	return 0;
 }
