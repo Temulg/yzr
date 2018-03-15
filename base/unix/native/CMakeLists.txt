@@ -1,5 +1,3 @@
-project( native )
-
 set( CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE )
 
 set( GENERATED_DATA_FILES )

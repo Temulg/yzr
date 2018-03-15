@@ -1,5 +1,3 @@
-project( unix )
-
 set( JAVA_BOOTSTRAP_SRCS UnixBootstrap.java )
 set(
 	JAVA_BOOTSTRAP_CLASSES
