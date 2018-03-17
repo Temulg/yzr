@@ -1,0 +1,14 @@
+
+embedded_classes [ java.compile [ fs.set '*.java'.glob ]]
+
+embedded_class_data [ fs.transform
+	embedded_classes
+	../buildtools/bin2cstr
+	[- .destination -> [-
+		.extension .data.h
+	]]
+	[- .action ../buildtools/bin2cstr ->
+		[- .stdin 'source'.prop ]
+		[- .stdout 'destination'.prop ]
+	]
+]

@@ -8,15 +8,47 @@
 
 grammar Yzr;
 
-yzrUnit: goal* EOF;
 
-goal: Identifier goalBody;
+yzrUnit: goal* ;
 
-goalBody: LBRACE goalLine* RBRACE;
+goal: Id goalBody;
 
-goalLine: Identifier SEMI;
+goalBody: '[' SuperId statement* ']';
 
-Identifier: JavaLetter JavaLetterOrDigit*;
+evalBody: '[-' MethodId statement* ('->' evalBody+)? ']';
+
+statement: evalBody | goalBody | StringLiteral;
+
+StringLiteral: StringTagged | StringInline;
+
+SuperId: Id ('.' Id)*;
+
+MethodId: ('.' Id) | (SuperId ('/' Id)?);
+
+StringTagged: StringQuoted ('.' Id)?;
+
+StringQuoted: '\'' StringCharacters? '\'' ('.' Id)?;
+
+Id: JavaLetter JavaLetterOrDigit*;
+
+StringInline: ~[ \t\r\n\u000C]+;
+
+fragment StringCharacters: StringCharacter+;
+fragment StringCharacter: ~['\\\r\n\u000C] | EscapeSequence;
+
+fragment EscapeSequence: '\\' [btnfr'\\] | OctalEscape | UnicodeEscape;
+
+fragment OctalEscape: '\\' OctalDigit
+	| '\\' OctalDigit OctalDigit
+	| '\\' ZeroToThree OctalDigit OctalDigit;
+
+fragment OctalDigit: [0-7];
+
+fragment ZeroToThree: [0-3];
+
+fragment UnicodeEscape: '\\' 'u'+ HexDigit HexDigit HexDigit HexDigit;
+
+fragment HexDigit: [0-9a-fA-F];
 
 fragment JavaLetter: [a-zA-Z$_]
 	| ~[\u0000-\u007F\uD800-\uDBFF] {
@@ -27,7 +59,7 @@ fragment JavaLetter: [a-zA-Z$_]
 				(char)_input.LA(-2), (char)_input.LA(-1)
 			)
 		)
-	}? ;
+	}?;
 
 fragment JavaLetterOrDigit: [a-zA-Z0-9$_]
 	| ~[\u0000-\u007F\uD800-\uDBFF] {
@@ -40,21 +72,8 @@ fragment JavaLetterOrDigit: [a-zA-Z0-9$_]
 		)
 	}?;
 
-//LPAREN: '(';
-//RPAREN: ')';
-LBRACE: '{';
-RBRACE: '}';
-//LBRACK: '[';
-//RBRACK: ']';
-SEMI: ';';
-//COMMA: ',';
-//DOT: '.';
-//ELLIPSIS: '...';
-//AT: '@';
-//COLONCOLON: '::';
-
 WS: [ \t\r\n\u000C]+ -> skip;
 
 COMMENT: '/*' .*? '*/' -> channel(HIDDEN);
 
-LINE_COMMENT: '//' ~[\r\n]* -> channel(HIDDEN);
+LINE_COMMENT: '//' ~[\r\n\u000C]* -> channel(HIDDEN);
