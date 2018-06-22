@@ -1,0 +1,29 @@
+plugins {
+	id 'java'
+	id 'eclipse'
+}
+
+repositories {
+	mavenLocal()
+	mavenCentral()
+}
+
+dependencies {
+	compile 'com.beust:jcommander:1.72'
+	compile 'org.clojure:clojure:1.9.0'
+	compile 'org.jgrapht:jgrapht-core:1.2.0'
+	compile 'com.h2database:h2-mvstore:1.4.197'
+}
+
+eclipse {
+	classpath {
+		downloadSources = true
+		downloadJavadoc = true
+	}
+}
+
+jar {
+	manifest {
+		attributes 'Main-Class': 'yzr.Application'
+	}
+}

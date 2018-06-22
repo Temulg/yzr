@@ -1,15 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <projectDescription>
-  <name>yzr</name>
-  <projects>
-    <project>base</project>
-  </projects>
-  <buildSpec>
-    <buildCommand>
-      <name>org.eclipse.jdt.core.javabuilder</name>
-    </buildCommand>
-  </buildSpec>
-  <natures>
-    <nature>org.eclipse.jdt.core.javanature</nature>
-  </natures>
+	<name>yzr</name>
+	<comment></comment>
+	<projects>
+		<project>base</project>
+	</projects>
+	<natures>
+		<nature>org.eclipse.jdt.core.javanature</nature>
+	</natures>
+	<buildSpec>
+		<buildCommand>
+			<name>org.eclipse.jdt.core.javabuilder</name>
+			<arguments/>
+		</buildCommand>
+	</buildSpec>
+	<linkedResources/>
+	<filteredResources/>
 </projectDescription>
