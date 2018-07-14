@@ -11,32 +11,36 @@ import java.util.List;
 
 public class Nomen {
 	public static Nomen from(List<String> elements) {
-		int charCount = 0;
+		int byteCount = 0;
 		for (var el: elements)
-			charCount += el.length();
+			byteCount += Utf8Helper.encodedLength(
+				el, 0, el.length()
+			);
 
-		var n = new Nomen(charCount);
-		int charPos = charCount;
+		var n = new Nomen(byteCount);
+		int bytePos = byteCount;
 		int bitPos = 0;
 		int symPos = 0;
 
 		for (var el: elements) {
-			el.getChars(0, el.length(), n.value, symPos);
-			symPos += el.length();
-			n.value[charPos] |= (char)(1 << bitPos);
-			bitPos += el.length();
-			charPos += bitPos >> 4;
-			bitPos &= 0xf;
+			int symPosPrev = symPos;
+			symPos = Utf8Helper.encode(
+				n.value, symPos, el, 0, el.length()
+			);
+			n.value[bytePos] |= (char)(1 << bitPos);
+			bitPos += symPos - symPosPrev;
+			bytePos += bitPos >> 3;
+			bitPos &= 7;
 		}
 
-		if (charPos < n.value.length)
-			n.value[charPos] |= (char)(1 << bitPos);
+		if (bytePos < n.value.length)
+			n.value[bytePos] |= (char)(1 << bitPos);
 
 		return n;
 	}
 
 	public int size() {
-		var tailOff = value.length / 17;
+		var tailOff = value.length / 9;
 		var tailLen = value.length - tailOff;
 		var sz = 0;
 
@@ -65,64 +69,66 @@ public class Nomen {
 
 		forEachElement((off, len) -> {
 			sb.append(delim);
-			sb.append(value, off, len);
+			Utf8Helper.decode(
+				sb::appendCodePoint, value, off, len
+			);
 		});
 
 		return sb.toString();
 	}
 
-	private Nomen(int charCount) {
-		value = new char[charCount + (charCount >> 4) + (
-			(charCount & 0xf) > 0 ? 1 : 0
+	private Nomen(int byteCount) {
+		value = new byte[byteCount + (byteCount >> 3) + (
+			(byteCount & 7) > 0 ? 1 : 0
 		)];
 	}
 
 	private void forEachElement(LocationConsumer cons) {
-		int symLen = (value.length << 4) / 17;
-		int charPos = symLen;
+		int symLen = (value.length << 3) / 9;
+		int bytePos = symLen;
 		int bitPos = 0;
 		int symPos = 0;
 
 		while (true) {
-			int len = nextSepOffset(charPos, bitPos);
+			int len = nextSepOffset(bytePos, bitPos);
 			cons.accept(symPos, len);
 			symPos += len;
 			if (symPos >= symLen)
 				break;
 
 			len += bitPos;
-			charPos += len >> 4;
-			bitPos = len & 0xf;
+			bytePos += len >> 3;
+			bitPos = len & 7;
 		}
 	}
 
-	private int nextSepOffset(int charPos, int bitPos) {
-		if (bitPos < 15) {
+	private int nextSepOffset(int bytePos, int bitPos) {
+		if (bitPos < 7) {
 			bitPos++;
 		} else {
 			bitPos = 0;
-			charPos++;
+			bytePos++;
 
-			if (charPos == value.length)
+			if (bytePos == value.length)
 				return 1;
 		}
 
-		int w = value[charPos];
+		int w = value[bytePos];
 		w &= ~((1 << bitPos) - 1);
 
 		if (w != 0) {	
 			return Integer.numberOfTrailingZeros(w) - bitPos + 1;
 		}
 
-		bitPos = 16 - bitPos + 1;
-		for (charPos++; charPos < value.length; charPos++) {
-			w = value[charPos];
+		bitPos = 8 - bitPos + 1;
+		for (bytePos++; bytePos < value.length; bytePos++) {
+			w = value[bytePos];
 			if (w != 0)
 				return bitPos + Integer.numberOfTrailingZeros(
 					w
 				);
 
-			bitPos += 16;
+			bitPos += 8;
 		}
 
 		return bitPos;
@@ -132,6 +138,6 @@ public class Nomen {
 		void accept(int offset, int length);
 	}
 
-	private final char[] value;
+	private final byte[] value;
 	private int hash;
 }
