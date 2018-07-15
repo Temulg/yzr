@@ -7,45 +7,36 @@
 package yzr.basis;
 
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.IntConsumer;
 
 public class Nomen {
 	public static Nomen from(List<String> elements) {
-		int byteCount = 0;
+		int bitCount = 0;
 		for (var el: elements)
-			byteCount += Utf8Helper.encodedLength(
+			bitCount += Utf8Helper.encodedBitLength(
 				el, 0, el.length()
 			);
 
-		var n = new Nomen(byteCount);
-		int bytePos = byteCount;
-		int bitPos = 0;
-		int symPos = 0;
+		var n = new Nomen(bitCount);
+		var ins = n.new Inserter(0, 0);
 
 		for (var el: elements) {
-			int symPosPrev = symPos;
-			symPos = Utf8Helper.encode(
-				n.value, symPos, el, 0, el.length()
-			);
-			n.value[bytePos] |= (char)(1 << bitPos);
-			bitPos += symPos - symPosPrev;
-			bytePos += bitPos >> 3;
-			bitPos &= 7;
+			ins.delimit();
+			el.codePoints().forEachOrdered(ins);
 		}
 
-		if (bytePos < n.value.length)
-			n.value[bytePos] |= (char)(1 << bitPos);
-
+		ins.delimit();
 		return n;
 	}
 
 	public int size() {
-		var tailOff = value.length / 9;
-		var tailLen = value.length - tailOff;
-		var sz = 0;
+		int sz = 0;
 
-		for (; tailOff < tailLen; tailOff++)
-			sz += Integer.bitCount(value[tailOff]);
+		for (long w: value)
+			sz += ByteHelper.bitCount((byte)(w >>> 56));
 
 		return sz;
 	}
@@ -67,77 +58,144 @@ public class Nomen {
 	public String toString(String delim) {
 		StringBuilder sb = new StringBuilder();
 
-		forEachElement((off, len) -> {
+		forEachElement((range) -> {
 			sb.append(delim);
-			Utf8Helper.decode(
-				sb::appendCodePoint, value, off, len
-			);
+			range.forEachRemaining(sb::appendCodePoint);
 		});
 
 		return sb.toString();
 	}
 
-	private Nomen(int byteCount) {
-		value = new byte[byteCount + (byteCount >> 3) + (
-			(byteCount & 7) > 0 ? 1 : 0
-		)];
-	}
+	private void forEachElement(Consumer<ByteRange> cons) {
+		int wordPos = 0;
+		int bytePos = 0;
 
-	private void forEachElement(LocationConsumer cons) {
-		int symLen = (value.length << 3) / 9;
-		int bytePos = symLen;
-		int bitPos = 0;
-		int symPos = 0;
-
-		while (true) {
-			int len = nextSepOffset(bytePos, bitPos);
-			cons.accept(symPos, len);
-			symPos += len;
-			if (symPos >= symLen)
-				break;
-
-			len += bitPos;
-			bytePos += len >> 3;
-			bitPos = len & 7;
+		for (
+			int len = nextSepOffset(wordPos, bytePos);
+			len != 0;
+			len = nextSepOffset(wordPos, bytePos)
+		) {
+			cons.accept(new ByteRange(wordPos, bytePos, len));
+			bytePos += len;
+			wordPos += bytePos / 7;
+			bytePos = bytePos % 7;
 		}
 	}
 
-	private int nextSepOffset(int bytePos, int bitPos) {
-		if (bitPos < 7) {
-			bitPos++;
-		} else {
-			bitPos = 0;
+	private int nextSepOffset(int wordPos, int bytePos) {
+		if (bytePos < 6) {
 			bytePos++;
+		} else {
+			if (wordPos < value.length) {
+				bytePos = 0;
+				wordPos++;
 
-			if (bytePos == value.length)
-				return 1;
+				if (wordPos == value.length)
+					return value[wordPos - 1] < 0 ? 1 : 0;
+			} else
+				return 0;
 		}
 
-		int w = value[bytePos];
-		w &= ~((1 << bitPos) - 1);
+		int w = (int)(value[wordPos] >>> 56);
+		w &= ~((1 << bytePos) - 1);
 
-		if (w != 0) {	
-			return Integer.numberOfTrailingZeros(w) - bitPos + 1;
-		}
+		if (w != 0)
+			return ByteHelper.trailingZeroes(
+				(byte)w
+			) - bytePos + 1;
 
-		bitPos = 8 - bitPos + 1;
-		for (bytePos++; bytePos < value.length; bytePos++) {
-			w = value[bytePos];
+		bytePos = 8 - bytePos;
+
+		for (wordPos++; wordPos < value.length; wordPos++) {
+			w = (int)(value[wordPos] >>> 56);
+
 			if (w != 0)
-				return bitPos + Integer.numberOfTrailingZeros(
-					w
+				return bytePos + ByteHelper.trailingZeroes(
+					(byte)w
 				);
 
-			bitPos += 8;
+			bytePos += 7;
 		}
 
-		return bitPos;
+		return bytePos;
 	}
 
-	private interface LocationConsumer {
-		void accept(int offset, int length);
+	private Nomen(int bitCount) {
+		value = new long[
+			(bitCount / 56) + ((bitCount % 56) > 0 ? 1 : 0)
+		];
 	}
 
-	private final byte[] value;
+	private class Inserter implements IntConsumer {
+		Inserter(int wordPos_, int bitPos_) {
+			wordPos = wordPos_;
+			bitPos = bitPos_;
+		}
+
+		@Override
+		public void accept(int cp) {
+			int blen = Utf8Helper.encodedBitLength(cp);
+			long w = Utf8Helper.encodeCodepoint(cp, blen);
+			int wrem = 56 - bitPos;
+
+			value[wordPos] |= (w << bitPos) & CP_MASK;
+			bitPos += blen;
+			wordPos += bitPos / 56;
+			bitPos %= 56;
+
+			if (wrem < blen)
+				value[wordPos] = w >>> wrem;
+		}
+
+		public void delimit() {
+			value[wordPos] |=  1L << (56 + (bitPos >> 3));
+		}
+
+		private int wordPos;
+		private int bitPos;
+	}
+
+	private class ByteRange implements Iterator<Integer> {
+		ByteRange(int wordPos_, int bytePos_, int length_) {
+			wordPos = wordPos_;
+			bitPos = bytePos_ << 3;
+			length = length_ << 3;
+		}
+
+		@Override
+		public boolean hasNext() {
+			return length > 0;
+		}
+
+		@Override
+		public Integer next() {
+			long w = value[wordPos] >>> bitPos;
+			int wrem = 56 - bitPos;
+			int blen = Utf8Helper.codepointBits((byte)w);
+
+			length -= blen;
+			bitPos += blen;
+			wordPos += bitPos / 56;
+			bitPos %= 56;
+
+			if (blen > wrem) {
+				w &= (1L << wrem) - 1L;
+				w |= (
+					value[wordPos]
+					& ((1L << (blen - wrem)) - 1L)
+				) << wrem;
+			}
+
+			return Utf8Helper.decodeCodepoint(w);
+		}
+
+		private int wordPos;
+		private int bitPos;
+		private int length;
+	}
+
+	private static final long CP_MASK = (1L << 56) - 1L;
+
+	private final long[] value;
 	private int hash;
 }
