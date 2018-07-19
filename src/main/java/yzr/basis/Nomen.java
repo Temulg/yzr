@@ -6,9 +6,10 @@
 
 package yzr.basis;
 
-import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Arrays;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
@@ -21,6 +22,9 @@ public class Nomen {
 			);
 
 		var n = new Nomen(bitCount);
+		if (n.isEmpty())
+			return n;
+
 		var ins = n.new Inserter(0, 0);
 
 		for (var el: elements) {
@@ -32,13 +36,20 @@ public class Nomen {
 		return n;
 	}
 
+	public boolean isEmpty() {
+		return value.length == 0;
+	}
+
 	public int size() {
+		if (isEmpty())
+			return 0;
+
 		int sz = 0;
 
 		for (long w: value)
-			sz += ByteHelper.bitCount((byte)(w >>> 56));
+			sz += ByteHelper.onesCount((byte)(w >>> 56));
 
-		return sz;
+		return sz - 1;
 	}
 
 	@Override
@@ -58,15 +69,78 @@ public class Nomen {
 	public String toString(String delim) {
 		StringBuilder sb = new StringBuilder();
 
-		forEachElement((range) -> {
+		forEachElement((Consumer<ByteRange>)range -> {
 			sb.append(delim);
-			range.forEachRemaining(sb::appendCodePoint);
+			range.forEachCodePoint(sb::appendCodePoint);
 		});
 
 		return sb.toString();
 	}
 
+	@Override
+	public boolean equals(Object other) {
+		if (other instanceof Nomen)
+			return (other == this) || Arrays.equals(
+				value, ((Nomen)other).value
+			);
+		else
+			return false;
+	}
+
+	public void toUtf8OutputStream(
+		OutputStream os, String delim_
+	) throws IOException {
+		forEachElement((ByteRangeConsumer<IOException>)range -> {
+			//sb.append(delim);
+			os.write(range.toByteArray());
+		});
+	}
+
+	/*
+	public Nomen add(Nomen other) {
+		var n = new Nomen(bitSize() + other.bitSize());
+		if (n.isEmpty())
+			return n;
+
+		var ins = n.new Inserter(0, 0);
+
+		return n;
+	}
+
+	public Nomen add(Nomen... others);
+
+	public Nomen prefixOf(Nomen other);
+
+	public Nomen suffixOf(Nomen other);
+
+	public Nomen commonPrefix(Nomen other);
+	*/
+
 	private void forEachElement(Consumer<ByteRange> cons) {
+		if (isEmpty())
+			return;
+
+		int wordPos = 0;
+		int bytePos = 0;
+
+		for (
+			int len = nextSepOffset(wordPos, bytePos);
+			len != 0;
+			len = nextSepOffset(wordPos, bytePos)
+		) {
+			cons.accept(new ByteRange(wordPos, bytePos, len));
+			bytePos += len;
+			wordPos += bytePos / 7;
+			bytePos = bytePos % 7;
+		}
+	}
+
+	private <E extends Exception> void forEachElement(
+		ByteRangeConsumer<E> cons
+	) throws E {
+		if (isEmpty())
+			return;
+
 		int wordPos = 0;
 		int bytePos = 0;
 
@@ -83,41 +157,47 @@ public class Nomen {
 	}
 
 	private int nextSepOffset(int wordPos, int bytePos) {
-		if (bytePos < 6) {
-			bytePos++;
-		} else {
-			if (wordPos < value.length) {
-				bytePos = 0;
-				wordPos++;
+		if (wordPos == value.length)
+			return 0;
 
-				if (wordPos == value.length)
-					return value[wordPos - 1] < 0 ? 1 : 0;
-			} else
+		bytePos++;
+
+		if (bytePos == 7) {
+			wordPos++;
+			if (wordPos == value.length)
 				return 0;
+
+			bytePos = 0;
 		}
 
-		int w = (int)(value[wordPos] >>> 56);
-		w &= ~((1 << bytePos) - 1);
-
+		byte w = (byte)(value[wordPos] >>> 56);
+		w &= (byte)~((1 << bytePos) - 1);
 		if (w != 0)
-			return ByteHelper.trailingZeroes(
-				(byte)w
-			) - bytePos + 1;
+			return ByteHelper.trailingZeros(w) - bytePos + 1;
 
 		bytePos = 8 - bytePos;
+		wordPos++;
+		if (wordPos == value.length)
+			return 0;
 
-		for (wordPos++; wordPos < value.length; wordPos++) {
-			w = (int)(value[wordPos] >>> 56);
-
+		while (true) {
+			w = (byte)(value[wordPos] >>> 56);
 			if (w != 0)
-				return bytePos + ByteHelper.trailingZeroes(
-					(byte)w
-				);
+				return bytePos + ByteHelper.trailingZeros(w);
 
 			bytePos += 7;
+			wordPos++;
 		}
+	}
 
-		return bytePos;
+	private int bitSize() {
+		int sz = value.length * 7;
+		if (sz > 0)
+			sz -= ByteHelper.leadingZeros(
+				(byte)(value[value.length - 1] >>> 56)
+			);
+
+		return sz << 3;
 	}
 
 	private Nomen(int bitCount) {
@@ -148,27 +228,39 @@ public class Nomen {
 		}
 
 		public void delimit() {
-			value[wordPos] |=  1L << (56 + (bitPos >> 3));
+			if (wordPos < value.length)
+				value[wordPos] |=  1L << (56 + (bitPos >> 3));
+			else
+				value[value.length - 1] |= 1L << 63;
 		}
 
 		private int wordPos;
 		private int bitPos;
 	}
 
-	private class ByteRange implements Iterator<Integer> {
+	private class ByteRange {
 		ByteRange(int wordPos_, int bytePos_, int length_) {
 			wordPos = wordPos_;
 			bitPos = bytePos_ << 3;
 			length = length_ << 3;
 		}
 
-		@Override
-		public boolean hasNext() {
-			return length > 0;
+		void forEachCodePoint(IntConsumer cons) {
+			while (length > 0)
+				cons.accept(nextCodePoint());
 		}
 
-		@Override
-		public Integer next() {
+		byte[] toByteArray() {
+			var b = new byte[length];
+
+			while (length > 0) {
+				
+			}
+
+			return b;
+		}
+
+		private int nextCodePoint() {
 			long w = value[wordPos] >>> bitPos;
 			int wrem = 56 - bitPos;
 			int blen = Utf8Helper.codepointBits((byte)w);
@@ -192,6 +284,10 @@ public class Nomen {
 		private int wordPos;
 		private int bitPos;
 		private int length;
+	}
+
+	private static interface ByteRangeConsumer<E extends Exception> {
+		void accept(ByteRange range) throws E;
 	}
 
 	private static final long CP_MASK = (1L << 56) - 1L;

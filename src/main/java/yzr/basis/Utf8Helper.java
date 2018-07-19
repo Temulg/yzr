@@ -89,7 +89,7 @@ public class Utf8Helper {
 	}
 
 	public static int codepointBits(byte b) {
-		int rv = UTF8_LEAD_TO_BITS[b];
+		int rv = UTF8_LEAD_TO_BITS[b & 0xff];
 		if (rv < 0)
 			throw new IllegalStateException(
 				"invalid UTF-8 sequence"
@@ -98,7 +98,7 @@ public class Utf8Helper {
 	}
 
 	public static int decodeCodepoint(long w) {
-		switch (UTF8_LEAD_TO_BITS[(byte)w]) {
+		switch (UTF8_LEAD_TO_BITS[(int)w & 0xff]) {
 		case 8:
 			return (int)(w & 0x7f);
 		case 16:

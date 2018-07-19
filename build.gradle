@@ -34,4 +34,5 @@ jar {
 test {
 	useTestNG()
 	outputs.upToDateWhen { false }
+	testLogging.showStandardStreams = true
 }
