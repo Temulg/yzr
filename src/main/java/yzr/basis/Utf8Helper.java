@@ -127,7 +127,7 @@ public class Utf8Helper {
 		32, 32, 32, 32, 32,
 		24, 24, 24, 24, 24,
 		16, 16, 16, 16,
-		8, 8, 8, 8, 8, 8, 8
+		8, 8, 8, 8, 8, 8, 8, 8
 	};
 
 	private static final byte[] UTF8_LEAD_TO_BITS = new byte[] {
