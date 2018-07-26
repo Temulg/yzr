@@ -125,4 +125,19 @@ public class NomenTest {
 			n.size(), s0.size() + s1.size() + s2.size()
 		);
 	}
+/*
+	@Test
+	public void tt() {
+		var n0 = Nomen.from(List.of(
+			"jFQIl", "sBAh", "EeYHpLA1el5rn", "AivLc", "6qfpe",
+			"EAo0xHavej63", "vi193oh4Z9v7"
+		));
+		var n1 = Nomen.from(List.of("BgFACN3"));
+		var n = n0.cat(n1);
+
+		var s = "/jFQIl/sBAh/EeYHpLA1el5rn/AivLc/6qfpe/EAo0xHavej63/vi193oh4Z9v7/BgFACN3";
+
+		Assert.assertEquals(n.toString(), s);
+	}
+*/
 }
