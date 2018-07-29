@@ -60,7 +60,7 @@ public class Nomen {
 	public int hashCode() {
 		int h = hash;
 		if (h == 0 && value.length > 0)
-			hash = h = Arrays.hashCode(value);
+			hash = h = HashCode32.of(value);
 
 		return h;
 	}
@@ -83,11 +83,11 @@ public class Nomen {
 
 	@Override
 	public boolean equals(Object other) {
-		if (other instanceof Nomen)
+		if (other instanceof Nomen) {
 			return (other == this) || Arrays.equals(
 				value, ((Nomen)other).value
 			);
-		else
+		} else
 			return false;
 	}
 
@@ -240,7 +240,7 @@ public class Nomen {
 			return;
 
 		int wordPos = 0;
-		int bytePos = ByteHelper.trailingZeros((byte)value[wordPos]);
+		int bytePos = 0;
 
 		for (
 			int len = nextSepOffset(wordPos, bytePos);
@@ -261,7 +261,7 @@ public class Nomen {
 			return;
 
 		int wordPos = 0;
-		int bytePos = ByteHelper.trailingZeros((byte)value[wordPos]);
+		int bytePos = 0;
 
 		for (
 			int len = nextSepOffset(wordPos, bytePos);
@@ -314,7 +314,7 @@ public class Nomen {
 		if (sz > 0)
 			sz -= ByteHelper.leadingZeros(
 				(byte)value[value.length - 1]
-			) + ByteHelper.trailingZeros((byte)value[0]);
+			);
 
 		return sz << 3;
 	}
