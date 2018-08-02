@@ -170,47 +170,56 @@ public class Nomen {
 			l = this;
 		}
 
-		int wordPos = diffWordPos(s, l);
+		int wordPos = 0;
+		int goodWordPos = -1;
 		int bytePos = -1;
 
-		if (wordPos < s.value.length) {
-			for (; wordPos >= 0; wordPos--) {
-				bytePos = lastCommonSep(
-					s.value[wordPos], l.value[wordPos]
-				);
+		for (; wordPos < s.value.length; wordPos++) {
+			if (s.value[wordPos] == l.value[wordPos]) {
+				if ((byte)s.value[wordPos] != 0)
+					goodWordPos = wordPos;
+			} else
+				break;
+		}
 
-				if (bytePos >= 0)
-					break;
-			}
-		} else if (wordPos < l.value.length) {
-			if ((s.value[wordPos - 1] & 0x80L) != 0) {
-				if ((l.value[wordPos] & 0x01L) != 0)
-					return s;
-			}
-
-			for (wordPos--; wordPos >= 0; wordPos--) {
-				bytePos = lastCommonSep(
-					s.value[wordPos], l.value[wordPos]
-				);
-
-				if (bytePos >= 0)
-					break;
-			}
-		} else
+		System.out.format("--1- %d (%d) of %d\n", wordPos, goodWordPos, s.value.length);
+		if (wordPos == s.value.length)
 			return s;
 
-		if (bytePos < 0)
-			return EMPTY_NOMEN;
+		bytePos = lastCommonSep(s.value[wordPos], l.value[wordPos]);
+		System.out.format("--2- %d, %016x, %016x\n", bytePos, s.value[wordPos], l.value[wordPos]);
 
 		if (wordPos > 0) {
-			return new Nomen(s, wordPos, bytePos);
-		} else {
-			long w = adjustLastSep(s.value[0], bytePos);
-			if (ByteHelper.onesCount((byte)w) > 1)
-				return new Nomen(new long[] { w });
+			if (bytePos > 0)
+				return new Nomen(s, wordPos, bytePos);
+			else if (bytePos == 0) {
+				var n = new Nomen(s, wordPos);
+				n.value[wordPos - 1] |= 0x80;
+				return n;
+			}
 
-			return EMPTY_NOMEN;
+			wordPos = goodWordPos;
+			bytePos = 7 - ByteHelper.leadingZeros(
+				(byte)s.value[wordPos]
+			);
 		}
+
+		if (wordPos > 0) {
+			if (bytePos > 0)
+				return new Nomen(s, wordPos, bytePos);
+			else {
+				var n = new Nomen(s, wordPos);
+				n.value[wordPos - 1] |= 0x80;
+				return n;
+			}
+		}
+
+		if (bytePos > 0)
+			return new Nomen(new long[] {
+				adjustLastSep(s.value[0], bytePos)
+			});
+		else
+			return EMPTY_NOMEN;
 	}
 
 	private Inserter initCatInserter(Nomen first) {
@@ -283,8 +292,12 @@ public class Nomen {
 
 		if (bytePos == 7) {
 			wordPos++;
-			if (wordPos == value.length)
-				return 0;
+			if (wordPos == value.length) {
+				if ((value[wordPos - 1] & 0x80) !=0)
+					return 1;
+				else
+					return 0;
+			}
 
 			bytePos = 0;
 		}
@@ -319,34 +332,32 @@ public class Nomen {
 		return sz << 3;
 	}
 
-	private static int diffWordPos(Nomen shorter, Nomen longer) {
-		for (int pos = 0; pos < shorter.value.length; pos++) {
-			if (shorter.value[pos] != longer.value[pos])
-				return pos;
-		}
-
-		return shorter.value.length;
-	}
-
 	private static int lastCommonSep(long w0, long w1) {
-		if ((byte)w0 == 0)
+		if ((byte)(w0 & w1)== 0)
 			return -1;
 
-		var sep = (byte)(w0 ^ w1);
+		var diff = w0 ^ w1;
+		var sep = diff & 0xff;
+		var sym = (Long.numberOfTrailingZeros(diff ^ sep) >>> 3) - 1;
+		System.out.format("-l1- %016x, %d\n", diff, sym);
+		if (sym == 0)
+			return -1;
+		var symMask = (1 << (sym + 1)) - 1;
+
 		if (sep == 0)
-			return 7 - ByteHelper.leadingZeros((byte)w0);
+			return 7 - ByteHelper.leadingZeros(
+				(byte)(w0 & symMask)
+			);
 
-		var mask = (byte)((1 << ByteHelper.trailingZeros(sep)) - 1);
-		sep = (byte)(w0 & mask);
-		if (sep != 0)
-			return 7 - ByteHelper.leadingZeros(sep);
-
-		return -2;
+		var sepMask = (1 << ByteHelper.trailingZeros((byte)sep)) - 1;
+		sep = w0 & sepMask & symMask;
+		return 7 - ByteHelper.leadingZeros((byte)sep);
 	}
 
-	private static long adjustLastSep(long w, int bitPos) {
-		var sep = (w & 0xff) & ((1 << (bitPos + 1)) - 1);
-		return (w & SYM_MASK) | sep;
+	private static long adjustLastSep(long w, int bytePos) {
+		var sep = (w & 0xff) & ((1 << (bytePos + 1)) - 1);
+		var mask = ((1L << (bytePos << 3)) - 1) << 8;
+		return w & mask | sep;
 	}
 
 	private static void subWordToByteBuffer(
@@ -368,10 +379,17 @@ public class Nomen {
 		];
 	}
 
+	private Nomen(Nomen other, int wordLen) {
+		value = new long[wordLen];
+		System.arraycopy(other.value, 0, value, 0, wordLen);
+	}
+
 	private Nomen(Nomen other, int wordPos, int bytePos) {
 		value = new long[wordPos + 1];
-		System.arraycopy(other.value, 0, value, 0, wordPos);
+		System.arraycopy(other.value, 0, value, 0, wordPos + 1);
+		System.out.format("-c1- %d, %d, %016x\n", wordPos, bytePos, value[wordPos]);
 		value[wordPos] = adjustLastSep(value[wordPos], bytePos);
+		System.out.format("-c2- %d, %d, %016x\n", wordPos, bytePos, value[wordPos]);
 	}
 
 	private Nomen(long[] value_) {
@@ -585,7 +603,6 @@ public class Nomen {
 	}
 
 	public static final Nomen EMPTY_NOMEN = new Nomen(0);
-	private static final long SYM_MASK = (~0L) << 8;
 
 	private final long[] value;
 	private int hash;

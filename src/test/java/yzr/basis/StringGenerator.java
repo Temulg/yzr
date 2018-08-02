@@ -39,7 +39,7 @@ public class StringGenerator {
 				var ls = r.nextInt(1, 16);
 				var out = new ArrayList<String>(ls);
 				for (; ls > 0; ls--)
-					out.add(RandomStringUtils.random(
+					out.add(RandomStringUtils.randomAlphanumeric(
 						r.nextInt(1, 16)
 					));
 
