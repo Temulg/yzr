@@ -22,6 +22,50 @@ public class ByteHelper {
 		return (BYTE_PARAMS[b & 0xff] >>> 8) & 0xf;
 	}
 
+	public static int trailingNthOne(byte b, int count) {
+		int pos = 0;
+
+		switch (count) {
+		case 7:
+			return (b == 0xff) ? 7 : -1;
+		case 6:
+			if (onesCount(b) > 6) {
+				return ((b & 0x7f) == 0x7f) ? 6 : 7;
+			} else
+				return -1;
+		case 5:
+			pos = trailingZeros(b);
+			if (pos > 2)
+				return -1;
+			b ^= 1 << pos;
+		case 4:
+			pos = trailingZeros(b);
+			if (pos > 3)
+				return -1;
+			b ^= 1 << pos;
+		case 3:
+			pos = trailingZeros(b);
+			if (pos > 4)
+				return -1;
+			b ^= 1 << pos;
+		case 2:
+			pos = trailingZeros(b);
+			if (pos > 5)
+				return -1;
+			b ^= 1 << pos;
+		case 1:
+			pos = trailingZeros(b);
+			if (pos > 6)
+				return -1;
+			b ^= 1 << pos;
+		case 0:
+			pos = trailingZeros(b);
+			return pos < 8 ? pos : -1;
+		default:
+			return -1;
+		}
+	}
+
 	private static char[] BYTE_PARAMS = new char[] {
 		(char)0x0880, (char)0x0701, (char)0x0611, (char)0x0602,// 0x00
 		(char)0x0521, (char)0x0502, (char)0x0512, (char)0x0503,

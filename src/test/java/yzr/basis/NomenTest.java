@@ -10,6 +10,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.channels.Channels;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.testng.Assert;
@@ -24,6 +25,10 @@ public class NomenTest {
 		} catch (IOException ex) {
 			throw new AssertionError(ex);
 		}
+	}
+
+	private static void assertEquals(Nomen actual, Nomen expected) {
+		Assert.assertEquals((Object)actual, (Object)expected);
 	}
 
 	@Test
@@ -69,6 +74,26 @@ public class NomenTest {
 		Assert.assertEquals(n.toString(), s);
 		Assert.assertEquals(fromUtf8(n), s);
 		Assert.assertEquals(n.size(), ss.size());
+	}
+
+	@Test(
+		dataProvider = "randomStringList_1",
+		dataProviderClass = StringGenerator.class
+	)
+	public void iterable(List<CharSequence> ss) throws Exception {
+		var n = Nomen.from(ss);
+		var nl0 = new ArrayList<Nomen>();
+		var nl1 = new ArrayList<Nomen>();
+
+		ss.forEach(s -> {
+			nl0.add(Nomen.from(s));
+		});
+
+		n.forEach(nl1::add);
+
+		Assert.assertEquals(nl0, nl1);
+		Assert.assertEquals(n, nl0);
+		Assert.assertEquals(n, nl1);
 	}
 
 	@Test(
@@ -127,6 +152,38 @@ public class NomenTest {
 	}
 
 	@Test(
+		dataProvider = "randomStringList_2",
+		dataProviderClass = StringGenerator.class
+	)
+	public void prefix1(
+		List<CharSequence> s0,
+		List<CharSequence> s1
+	) throws Exception {
+		var n0 = Nomen.from(s0);
+		var n1 = Nomen.from(s1);
+
+		var n01 = n0.cat(n1);
+
+		var nc0 = n01.commonPrefix(n0);
+		var nc1 = n0.commonPrefix(n01);
+
+		var sb = new StringBuilder();
+		s0.forEach(s -> {
+			sb.append('/').append(s);
+		});
+
+		// Compare as Object
+		assertEquals(nc0, n0);
+		assertEquals(nc1, n0);
+
+		// Compare as Iterable
+		Assert.assertEquals(nc0, n0);
+		Assert.assertEquals(nc1, n0);
+		Assert.assertEquals(nc0.toString(), sb.toString());
+		Assert.assertEquals(nc1.toString(), sb.toString());
+	}
+
+	@Test(
 		dataProvider = "randomStringList_3",
 		dataProviderClass = StringGenerator.class
 	)
@@ -140,6 +197,7 @@ public class NomenTest {
 		var n2 = Nomen.from(s2);
 		var n01 = n0.cat(n1);
 		var n02 = n0.cat(n2);
+
 		var nc1 = n01.commonPrefix(n02);
 		var nc2 = n02.commonPrefix(n01);
 
@@ -148,32 +206,96 @@ public class NomenTest {
 			sb.append('/').append(s);
 		});
 
+		// Compare as Object
+		assertEquals(nc1, n0);
+		assertEquals(nc2, n0);
+
+		// Compare as Iterable
 		Assert.assertEquals(nc1, n0);
 		Assert.assertEquals(nc2, n0);
 		Assert.assertEquals(nc1.toString(), sb.toString());
 		Assert.assertEquals(nc2.toString(), sb.toString());
 	}
 
-	@Test
-	public void special() throws Exception {
-		System.out.println("--- special ---");
-		cat3(List.of(
-			"ZcrPNN2IB", "Isg6b6r95MXEP5", "L4925WnQMn73BZ",
-			"SU3", "GeCleuS8Iij", "lOfEAWXCvhf", "TdCarcC",
-			"kgNKNOqkTn9oZV", "AtuuBRus6S9", "4iQmRAegCRG2",
-			"kecVEUourd", "c", "QliI", "HWhlgaQ"
-		), List.of("YMYbWp"), List.of(
-			"Gg3OD8O", "l4e", "hnBCW4DkHqLs", "ETLFwEzRxd3KI",
-			"uI", "pH31Q1SYbm", "dP", "GYPf7ETldEqdHX7", "EzjuW",
-			"hWxr", "yESCuR", "67", "jHiTQ4", "u4", "v"
-		));
+	@Test(
+		dataProvider = "randomStringList_2",
+		dataProviderClass = StringGenerator.class
+	)
+	public void rel2(
+		List<CharSequence> s0, List<CharSequence> s1
+	) throws Exception {
+		var n0 = Nomen.from(s0);
+		var n1 = Nomen.from(s1);
+		var n = n0.cat(n1);
 
-		prefix2(List.of(
-			"FwYXMTgxr3aK", "yt8RsT", "J8JaMO", "cSNyK9AX4oEW1R"
-		), List.of(
-			"srDW6blcu7UV9G", "CX", "nc", "4nAuF",
-			"O7tY6gTQq3lCC16", "APg6mJ1", "p4", "sWAvqF9vgajnj",
-			"H5ZQfeCIsxY"
-		), List.of("BgERz", "TeapdPW818", "dpbn")); 
+		var rel = n0.relativize(n);
+
+		// Compare as Object
+		assertEquals(rel, n1);
+
+		// Compare as Iterable
+		Assert.assertEquals(rel, n1);
+	}
+
+	@Test(
+		dataProvider = "randomStringList_1_pos_1",
+		dataProviderClass = StringGenerator.class
+	)
+	public void sub1(List<CharSequence> ss, int first) throws Exception {
+		var n = Nomen.from(ss);
+		var n0 = n.subNomen(first);
+
+		var s1 = ss.subList(first, ss.size());
+		var n1 = Nomen.from(s1);
+
+		// Compare as Object
+		assertEquals(n0, n1);
+
+		// Compare as Iterable
+		Assert.assertEquals(n0, n1);
+	}
+
+	@Test(
+		dataProvider = "randomStringList_1_pos_1",
+		dataProviderClass = StringGenerator.class
+	)
+	public void get1(List<CharSequence> ss, int first) throws Exception {
+		if (ss.isEmpty())
+			return;
+
+		var n = Nomen.from(ss);
+		var n0 = n.get(first);
+
+		var s1 = ss.get(first);
+		var n1 = Nomen.from(s1);
+
+		// Compare as Object
+		assertEquals(n0, n1);
+
+		// Compare as Iterable
+		Assert.assertEquals(n0, n1);
+	}
+
+	@Test(
+		dataProvider = "randomStringList_1_pos_2",
+		dataProviderClass = StringGenerator.class
+	)
+	public void sub2(
+		List<CharSequence> ss, int first, int last
+	) throws Exception {
+		if (ss.isEmpty() || (first == last))
+			return;
+
+		var n = Nomen.from(ss);
+		var n0 = n.subNomen(first, last);
+
+		var s1 = ss.subList(first, last);
+		var n1 = Nomen.from(s1);
+
+		// Compare as Object
+		assertEquals(n0, n1);
+
+		// Compare as Iterable
+		Assert.assertEquals(n0, n1);
 	}
 }

@@ -6,26 +6,26 @@
 
 package yzr.basis;
 
-import java.util.List;
 import java.util.Arrays;
+import java.util.Iterator;
+import java.nio.ByteOrder;
+import java.nio.ByteBuffer;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
-import java.util.function.LongConsumer;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.channels.WritableByteChannel;
 
-public class Nomen {
-	public static Nomen from(List<CharSequence> elements) {
+public class Nomen implements Iterable<Nomen> {
+	public static Nomen from(Iterable<CharSequence> elements) {
 		int bitCount = 0;
 		for (var el: elements)
 			bitCount += Utf8Helper.encodedBitLength(
 				el, 0, el.length()
 			);
 
-		var n = new Nomen(bitCount);
+		var n = makeFromByteSize(bitCount >>> 3);
 		if (n.isEmpty())
 			return n;
 
@@ -37,6 +37,27 @@ public class Nomen {
 		}
 
 		ins.delimit();
+		return n;
+	}
+
+	public static Nomen from(CharSequence... elements) {
+		return from(Arrays.asList(elements));
+	}
+
+	public static Nomen from(CharSequence element) {
+		var bitCount = Utf8Helper.encodedBitLength(
+			element, 0, element.length()
+		);
+
+		var n = makeFromByteSize(bitCount >>> 3);
+		if (n.isEmpty())
+			return n;
+
+		var ins = n.new Inserter(0, 0);
+		ins.delimit();
+		element.codePoints().forEachOrdered(ins::acceptCodePoint);
+		ins.delimit();
+
 		return n;
 	}
 
@@ -73,7 +94,7 @@ public class Nomen {
 	public String toString(String delim) {
 		StringBuilder sb = new StringBuilder();
 
-		forEachElement(range -> {
+		forEachElementRange(range -> {
 			sb.append(delim);
 			range.forEachCodePoint(sb::appendCodePoint);
 		});
@@ -97,7 +118,7 @@ public class Nomen {
 		var delim = ByteBuffer.wrap(delim_.getBytes(
 			StandardCharsets.UTF_8
 		));
-		forEachElementEx(range -> {
+		forEachElementRangeEx(range -> {
 			ch.write(delim);
 			delim.rewind();
 			ch.write(range.toByteBuffer());
@@ -105,57 +126,151 @@ public class Nomen {
 	}
 
 	public Nomen cat(Nomen other) {
-		var n = new Nomen(bitSize() + other.bitSize());
-		if (n.isEmpty())
-			return n;
+		var oz = other.byteSize();
+		if (oz == 0)
+			return this;
 
-		var ins = n.initCatInserter(this);
+		int bytePos = byteSize();
+		if (bytePos == 0)
+			return other;
 
-		other.forEachElement(range -> {
-			ins.acceptByteRange(range);
-			ins.delimit();
-		});
+		var n = makeFromByteSize(bytePos + oz);
+
+		System.arraycopy(value, 0, n.value, 0, value.length);
+
+		int wordPos = bytePos / 7;
+		bytePos %= 7;
+
+		if (bytePos != 0)
+			copyShiftByteRange(
+				n.value, wordPos, bytePos, other.value
+			);
+		else {
+			n.value[wordPos - 1] = (
+				n.value[wordPos - 1] | 0x80
+			) ^ 0x80;
+			System.arraycopy(
+				other.value, 0, n.value, wordPos,
+				other.value.length
+			);
+		}
+
+		if (((bytePos + oz) % 7) == 0)
+			n.value[n.value.length - 1] |= 0x80;
 
 		return n;
 	}
 
 	public Nomen cat(Nomen... others) {
-		int sz = bitSize();
-		for (var other: others)
-			sz += other.bitSize();
+		if (isEmpty()) {
+			int pos = 1;
+			for (var other: others) {
+				if (other.isEmpty())
+					pos++;
+				else
+					return other.cat(pos, others);
+			}
+			return EMPTY;
+		} else
+			return cat(0, others);
+	}
 
-		var n = new Nomen(sz);
-		if (n.isEmpty())
-			return n;
+	private Nomen cat(int pos_, Nomen... others) {
+		int bytePos = byteSize();
+		int sz = bytePos;
 
-		var ins = n.initCatInserter(this);
+		for (int pos = pos_; pos < others.length; pos++)
+			sz += others[pos].byteSize();
 
-		for (var other: others) {
-			other.forEachElement(range -> {
-				ins.acceptByteRange(range);
-				ins.delimit();
-			});
+		var n = makeFromByteSize(sz);
+
+		System.arraycopy(value, 0, n.value, 0, value.length);
+
+		sz = bytePos;
+		int wordPos = bytePos / 7;
+		bytePos %= 7;
+
+		for (int pos = pos_; pos < others.length; pos++) {
+			var other = others[pos];
+			var oz = other.byteSize();
+
+			if (oz == 0)
+				continue;
+
+			if (bytePos != 0) {
+				copyShiftByteRange(
+					n.value, wordPos, bytePos,
+					other.value
+				);
+			} else {
+				n.value[wordPos - 1] = (
+					n.value[wordPos - 1] | 0x80
+				) ^ 0x80;
+				System.arraycopy(
+					other.value, 0, n.value, wordPos,
+					other.value.length
+				);
+			}
+			sz += oz;
+			wordPos = sz / 7;
+			bytePos = sz % 7;
 		}
+
+		if (bytePos == 0)
+			n.value[wordPos - 1] |= 0x80;
 
 		return n;
 	}
-/*
+
 	public Nomen relativize(Nomen other) {
-		if (isEmpty())
-			return this;
-		if (other.isEmpty())
+		if (isEmpty() || other.isEmpty())
 			return other;
 
 		if (value.length > other.value.length)
-			return new Nomen(0);
+			throw new NomenException.NotASubNomen(this, other);
 
-		int wordPos = diffWordPos(this, other);
-		if (wordPos < value.length)
-			return new Nomen(0);
+		int wordPos = 0;
+		for (; wordPos < value.length; wordPos++) {
+			if (value[wordPos] != other.value[wordPos])
+				break;
+		}
 
-		
+		switch (value.length - wordPos) {
+		case 1:
+			break;
+		case 0:
+			if (other.value.length == value.length)
+				return EMPTY;
+			else {
+				wordPos--;
+				break;
+			}
+		default:
+			throw new NomenException.NotASubNomen(this, other);
+		}
+
+		long w = value[wordPos];
+		int bytePos = 7 - ByteHelper.leadingZeros((byte)w);
+
+		if ((bytePos < 7) && (lastCommonSep(
+			w, other.value[wordPos]
+		) == bytePos)) {
+			return new Nomen(copyAlignByteRange(
+				other.value, wordPos, bytePos,
+				other.remainingByteSize(wordPos, bytePos)
+			));
+		} else if ((other.value.length > value.length) && ((
+			other.value[wordPos + 1] & 0x1) != 0
+		)) {
+			return makeFromOtherAligned(
+				other, wordPos + 1,
+				other.value.length - wordPos - 1
+			);
+		}
+
+		throw new NomenException.NotASubNomen(this, other);
 	}
-*/
+
 	public Nomen commonPrefix(Nomen other) {
 		if (isEmpty())
 			return this;
@@ -182,18 +297,27 @@ public class Nomen {
 				break;
 		}
 
-		System.out.format("--1- %d (%d) of %d\n", wordPos, goodWordPos, s.value.length);
 		if (wordPos == s.value.length)
 			return s;
 
+		if ((s.value[wordPos] ^ l.value[wordPos]) == 0x80) {
+			if ((
+				l.value.length > s.value.length
+			) && (
+				(l.value[wordPos + 1] & 0x1) != 0
+			))
+				return s;
+		}
+
 		bytePos = lastCommonSep(s.value[wordPos], l.value[wordPos]);
-		System.out.format("--2- %d, %016x, %016x\n", bytePos, s.value[wordPos], l.value[wordPos]);
 
 		if (wordPos > 0) {
 			if (bytePos > 0)
-				return new Nomen(s, wordPos, bytePos);
+				return makeFromOtherAdjustLastSep(
+					s, wordPos, bytePos
+				);
 			else if (bytePos == 0) {
-				var n = new Nomen(s, wordPos);
+				var n = makeFromOtherAligned(s, 0, wordPos);
 				n.value[wordPos - 1] |= 0x80;
 				return n;
 			}
@@ -206,9 +330,11 @@ public class Nomen {
 
 		if (wordPos > 0) {
 			if (bytePos > 0)
-				return new Nomen(s, wordPos, bytePos);
+				return makeFromOtherAdjustLastSep(
+					s, wordPos, bytePos
+				);
 			else {
-				var n = new Nomen(s, wordPos);
+				var n = makeFromOtherAligned(s, 0, wordPos);
 				n.value[wordPos - 1] |= 0x80;
 				return n;
 			}
@@ -219,32 +345,151 @@ public class Nomen {
 				adjustLastSep(s.value[0], bytePos)
 			});
 		else
-			return EMPTY_NOMEN;
+			return EMPTY;
 	}
 
-	private Inserter initCatInserter(Nomen first) {
-		if (first.isEmpty()) {
-			value[0] |= 1L;
-			return new Inserter(0, 0);
+	public Nomen subNomen(int first) {
+		if (first == 0)
+			return this;
+
+		int wordPos = -1;
+		int elemCount = 0;
+		for (int pos = 0; pos < value.length; pos++) {
+			int nextCount = elemCount + ByteHelper.onesCount(
+				(byte)value[pos]
+			);
+			if (nextCount > first) {
+				wordPos = pos;
+				break;
+			}
+			elemCount = nextCount;
 		}
 
-		System.arraycopy(first.value, 0, value, 0, first.value.length);
+		if (wordPos < 0)
+			throw new IndexOutOfBoundsException(first);
 
-		var wordPos = first.value.length - 1;
-		var bytePos = 7 - ByteHelper.leadingZeros(
-			(byte)value[wordPos]
+		int bytePos = ByteHelper.trailingNthOne(
+			(byte)value[wordPos], first - elemCount
 		);
 
-		if (bytePos != 7)
-			return new Inserter(wordPos, bytePos << 3);
+		int len = remainingByteSize(wordPos, bytePos);
+		if (len == 0)
+			throw new IndexOutOfBoundsException(first);
 
-		value[wordPos] ^= 0x80L;
-		wordPos++;
-		value[wordPos] |= 1L;
-		return new Inserter(wordPos, 0);
+		return new Nomen(copyAlignByteRange(
+			value, wordPos, bytePos, len
+		));
 	}
 
-	private void forEachElement(Consumer<ByteRange> cons) {
+	public Nomen subNomen(int first, int last) {
+		int wordPos = -1;
+		int elemCount = 0;
+
+		for (int pos = 0; pos < value.length; pos++) {
+			int nextCount = elemCount + ByteHelper.onesCount(
+				(byte)value[pos]
+			);
+			if (nextCount > first) {
+				wordPos = pos;
+				break;
+			}
+			elemCount = nextCount;
+		}
+
+		if (wordPos < 0)
+			throw new IndexOutOfBoundsException(first);
+
+		int bytePos = ByteHelper.trailingNthOne(
+			(byte)value[wordPos], first - elemCount
+		);
+
+		int len = 0;
+		int wp = wordPos;
+		int bp = bytePos;
+		for (; first < last; first++) {
+			int nl = nextSepOffset(wp, bp);
+			if (nl == 0)
+				throw new IndexOutOfBoundsException(first);
+
+			len += nl;
+			bp += nl;
+			wp += bp / 7;
+			bp %= 7;
+		}
+
+		return new Nomen(copyAlignByteRange(
+			value, wordPos, bytePos, len
+		));
+	}
+
+	public Nomen get(int pos) {
+		return subNomen(pos, pos + 1);
+	}
+
+	@Override
+	public void forEach(Consumer<? super Nomen> cons) {
+		int bytePos = 0;
+		int last = byteSize();
+
+		while (bytePos < last) {
+			int wp = bytePos / 7;
+			int bp = bytePos % 7;
+			int len = nextSepOffset(wp, bp);
+
+			if (len == 0)
+				break;
+
+			cons.accept(new Nomen(copyAlignByteRange(
+				value, wp, bp, len
+			)));
+
+			bytePos += len;
+		}
+	}
+
+	@Override
+	public Iterator<Nomen> iterator() {
+		return new Iterator<Nomen>() {
+			@Override
+			public boolean hasNext() {
+				return bytePos < last;
+			}
+
+			@Override
+			public Nomen next() {
+				int wp = bytePos / 7;
+				int bp = bytePos % 7;
+				int len = nextSepOffset(wp, bp);
+				if (len == 0)
+					return EMPTY;
+
+				var n = new Nomen(copyAlignByteRange(
+					value, wp, bp, len
+				));
+
+				bytePos += len;
+
+				return n;
+			}
+
+			private int bytePos = 0;
+			private final int last = byteSize();
+		};
+	}
+
+	public void dump(PrintStream s) {
+		s.append('[');
+		int pos = 0;
+		if (pos < value.length)
+			s.format("%016x", value[pos++]);
+
+		for (; pos < value.length; pos++)
+			s.format(", %016x", value[pos]);
+
+		s.append(']');
+	}
+
+	private void forEachElementRange(Consumer<ByteRange> cons) {
 		if (isEmpty())
 			return;
 
@@ -263,7 +508,7 @@ public class Nomen {
 		}
 	}
 
-	private <E extends Exception> void forEachElementEx(
+	private <E extends Exception> void forEachElementRangeEx(
 		ByteRangeConsumer<E> cons
 	) throws E {
 		if (isEmpty())
@@ -302,7 +547,7 @@ public class Nomen {
 			bytePos = 0;
 		}
 
-		byte w = (byte)(value[wordPos]);
+		byte w = (byte)value[wordPos];
 		w &= (byte)~((1 << bytePos) - 1);
 		if (w != 0)
 			return ByteHelper.trailingZeros(w) - bytePos + 1;
@@ -313,7 +558,7 @@ public class Nomen {
 			return 0;
 
 		while (true) {
-			w = (byte)(value[wordPos]);
+			w = (byte)value[wordPos];
 			if (w != 0)
 				return bytePos + ByteHelper.trailingZeros(w);
 
@@ -322,14 +567,20 @@ public class Nomen {
 		}
 	}
 
-	private int bitSize() {
-		int sz = value.length * 7;
-		if (sz > 0)
-			sz -= ByteHelper.leadingZeros(
+	private int byteSize() {
+		return value.length > 0
+			? value.length * 7 - ByteHelper.leadingZeros(
+				(byte)value[value.length - 1]
+			) : 0;
+	}
+
+	private int remainingByteSize(
+		int wordPos, int bytePos
+	) {
+		return (value.length - wordPos) * 7 - bytePos
+			- ByteHelper.leadingZeros(
 				(byte)value[value.length - 1]
 			);
-
-		return sz << 3;
 	}
 
 	private static int lastCommonSep(long w0, long w1) {
@@ -339,9 +590,7 @@ public class Nomen {
 		var diff = w0 ^ w1;
 		var sep = diff & 0xff;
 		var sym = (Long.numberOfTrailingZeros(diff ^ sep) >>> 3) - 1;
-		System.out.format("-l1- %016x, %d\n", diff, sym);
-		if (sym == 0)
-			return -1;
+
 		var symMask = (1 << (sym + 1)) - 1;
 
 		if (sep == 0)
@@ -373,23 +622,107 @@ public class Nomen {
 		dst.position(dst.position() - 1);
 	}
 
-	private Nomen(int bitCount) {
-		value = new long[
-			(bitCount / 56) + ((bitCount % 56) > 0 ? 1 : 0)
-		];
+	private static long shiftWordRight(long w, int bytePos) {
+		var sep = (w & 0xff) >>> bytePos;
+		w >>>= (bytePos + 1) << 3;
+		w <<= 8;
+		return w | sep;
 	}
 
-	private Nomen(Nomen other, int wordLen) {
+	private static long shiftWordLeft(long w, int bytePos) {
+		var sep = w << bytePos;
+		w >>>= 8;
+		w <<= (bytePos + 1) << 3;
+		return w | (sep & 0xff);
+	}
+
+	private static Nomen makeFromByteSize(int byteSize) {
+		return new Nomen(
+			byteSize % 7 > 0 ? byteSize / 7 + 1 : byteSize / 7
+		);
+	}
+
+	private static Nomen makeFromOtherAligned(
+		Nomen other, int wordOff, int wordLen
+	) {
+		var n = new Nomen(new long[wordLen]);
+		System.arraycopy(other.value, wordOff, n.value, 0, wordLen);
+		return n;
+	}
+
+	private static Nomen makeFromOtherAdjustLastSep(
+		Nomen other, int wordPos, int bytePos
+	) {
+		var n = new Nomen(new long[wordPos + 1]);
+		System.arraycopy(other.value, 0, n.value, 0, wordPos + 1);
+		n.value[wordPos] = adjustLastSep(n.value[wordPos], bytePos);
+		return n;
+	}
+
+	private static long[] copyAlignByteRange(
+		long[] src, int wordPos, int bytePos, int byteLen
+	) {
+		int dstLen = byteLen / 7;
+		int dstRem = byteLen % 7;
+
+		if (dstRem > 0)
+			dstLen++;
+
+		long[] dst = new long[dstLen];
+
+		if (bytePos != 0) {
+			long w = shiftWordRight(src[wordPos++], bytePos);
+			byteLen -= 7 - bytePos;
+			int dstPos = 0;
+
+			for (; byteLen > 0; byteLen -= 7) {
+				w |= shiftWordLeft(src[wordPos], 7 - bytePos);
+				w = (w | 0x80) ^ 0x80;
+				dst[dstPos++] = w;
+				w = shiftWordRight(src[wordPos++], bytePos);
+			}
+
+			if (dstPos < dst.length)
+				dst[dstPos] = w;
+		} else
+			System.arraycopy(src, wordPos, dst, 0, dstLen);
+
+		if (dstRem > 0) {
+			long mask = ((1L << (dstRem << 3)) - 1) << 8;
+			mask |= dst[dstLen - 1] & ((1L << dstRem) - 1);
+			dst[dstLen - 1] &= mask;
+			dst[dstLen - 1] |= 1L << dstRem;
+		} else
+			dst[dstLen - 1] |= 0x80;
+
+		return dst;
+	}
+
+	private static void copyShiftByteRange(
+		long[] dst, int wordPos, int bytePos, long[] src
+	) {
+		int diff = 7 - bytePos;
+		long w = shiftWordLeft(src[0], bytePos);
+		dst[wordPos++] |= (w | 0x80) ^ 0x80;
+		int srcPos = 0;
+
+		while (true) {
+			w = shiftWordRight(src[srcPos++], diff);
+			if (srcPos == src.length) {
+				if (wordPos < dst.length)
+					dst[wordPos] = w;
+
+				return;
+			}
+
+			w |= shiftWordLeft(src[srcPos], bytePos);
+			w = (w | 0x80) ^ 0x80;
+			dst[wordPos++] = w;
+		}
+	}
+
+	private Nomen(int wordLen) {
 		value = new long[wordLen];
-		System.arraycopy(other.value, 0, value, 0, wordLen);
-	}
-
-	private Nomen(Nomen other, int wordPos, int bytePos) {
-		value = new long[wordPos + 1];
-		System.arraycopy(other.value, 0, value, 0, wordPos + 1);
-		System.out.format("-c1- %d, %d, %016x\n", wordPos, bytePos, value[wordPos]);
-		value[wordPos] = adjustLastSep(value[wordPos], bytePos);
-		System.out.format("-c2- %d, %d, %016x\n", wordPos, bytePos, value[wordPos]);
 	}
 
 	private Nomen(long[] value_) {
@@ -400,29 +733,6 @@ public class Nomen {
 		Inserter(int wordPos_, int bitPos_) {
 			wordPos = wordPos_;
 			bitPos = bitPos_;
-		}
-
-		void acceptByteRange(ByteRange range) {
-			if (bitPos != 0) {
-				var acc = new MisalignedByteRangeInserter(
-					range
-				);
-				range.forEachWord(acc);
-			} else {
-				var lastPos = wordPos;
-				var bitLength = range.bitLength;
-
-				range.forEachWord(w -> {
-					value[wordPos] |= w << 8;
-					wordPos++;
-				});
-
-				bitLength -= (wordPos - lastPos) * 56;
-				if (bitLength < 0) {
-					wordPos--;
-					bitPos = 56 + bitLength;
-				}
-			}
 		}
 
 		void acceptCodePoint(int cp) {
@@ -446,42 +756,6 @@ public class Nomen {
 				value[value.length - 1] |= 0x80L;
 		}
 
-		private class MisalignedByteRangeInserter
-		implements LongConsumer {
-			MisalignedByteRangeInserter(ByteRange range) {
-				bitLength = range.bitLength;
-				mask = (1L << (bitPos + 8)) - 1;
-				wrem = 56 - bitPos;
-			}
-
-			@Override
-			public void accept(long w) {
-				value[wordPos] &= mask;
-				value[wordPos] |= w << (bitPos + 8);
-
-				if (value.length == (wordPos + 1)) {
-					bitPos += bitLength;
-					bitLength = 0;
-					return;
-				}
-
-				wordPos++;
-				value[wordPos] = (w >>> wrem) << 8;
-				bitLength -= 56;
-				if (bitLength < 0) {
-					bitPos += bitLength;
-					bitLength = 0;
-					if (bitPos < 0) {
-						wordPos--;
-						bitPos = 56 + bitPos;
-					}
-				}
-			}
-
-			long bitLength;
-			final long mask;
-			final int wrem;
-		}
 
 		private int wordPos;
 		private int bitPos;
@@ -497,38 +771,6 @@ public class Nomen {
 		void forEachCodePoint(IntConsumer cons) {
 			while (bitLength > 0)
 				cons.accept(nextCodePoint());
-		}
-
-		void forEachWord(LongConsumer cons) {
-			if (bitPos != 0) {
-				var lim = value.length - 1;
-				var skip = 56 - bitPos;
-				for (; wordPos < lim; wordPos++) {
-					var w = value[wordPos + 1] >>> 8;
-					w <<= skip;
-					w |= value[wordPos] >>> (bitPos + 8);
-					cons.accept(w);
-					bitLength -= 56;
-					if (bitLength <= 0) {
-						bitPos += bitLength;
-						return;
-					}
-				}
-
-				if (bitLength > 0) {
-					cons.accept(
-						value[wordPos] >>> (bitPos + 8)
-					);
-					bitPos += bitLength;
-					bitLength = 0;
-				}
-			} else {
-				for (; bitLength > 0; bitLength -= 56) {
-					cons.accept(value[wordPos] >>> 8);
-					wordPos++;
-				}
-				bitLength = 0;
-			}
 		}
 
 		ByteBuffer toByteBuffer() {
@@ -602,7 +844,7 @@ public class Nomen {
 		void accept(ByteRange range) throws E;
 	}
 
-	public static final Nomen EMPTY_NOMEN = new Nomen(0);
+	public static final Nomen EMPTY = new Nomen(0);
 
 	private final long[] value;
 	private int hash;
