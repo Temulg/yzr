@@ -65,7 +65,7 @@ public class StringGenerator {
 				return out;
 			}
 
-			private int remaining = 100;
+			private int remaining = 10;
 		};
 	}
 

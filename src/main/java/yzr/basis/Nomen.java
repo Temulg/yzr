@@ -19,13 +19,13 @@ import java.nio.channels.WritableByteChannel;
 
 public class Nomen implements Iterable<Nomen> {
 	public static Nomen from(Iterable<CharSequence> elements) {
-		int bitCount = 0;
+		int byteCount = 0;
 		for (var el: elements)
-			bitCount += Utf8Helper.encodedBitLength(
+			byteCount += Utf8Helper.encodedByteLength(
 				el, 0, el.length()
 			);
 
-		var n = makeFromByteSize(bitCount >>> 3);
+		var n = makeFromByteSize(byteCount);
 		if (n.isEmpty())
 			return n;
 
@@ -45,11 +45,11 @@ public class Nomen implements Iterable<Nomen> {
 	}
 
 	public static Nomen from(CharSequence element) {
-		var bitCount = Utf8Helper.encodedBitLength(
+		var byteCount = Utf8Helper.encodedByteLength(
 			element, 0, element.length()
 		);
 
-		var n = makeFromByteSize(bitCount >>> 3);
+		var n = makeFromByteSize(byteCount);
 		if (n.isEmpty())
 			return n;
 
@@ -610,11 +610,11 @@ public class Nomen implements Iterable<Nomen> {
 	}
 
 	private static void subWordToByteBuffer(
-		ByteBuffer dst, long w, int bitShift, int bitLen
+		ByteBuffer dst, long w, int bytePos, int length
 	) {
-		w >>>= bitShift + 8;
+		w >>>= (bytePos + 1) << 3;
 		dst.putLong(w);
-		dst.position(dst.position() - ((64 - bitLen) >> 3));
+		dst.position(dst.position() - 8 + length);
 	}
 
 	private static void wordToByteBuffer(ByteBuffer dst, long w) {
@@ -730,114 +730,110 @@ public class Nomen implements Iterable<Nomen> {
 	}
 
 	private class Inserter {
-		Inserter(int wordPos_, int bitPos_) {
+		Inserter(int wordPos_, int bytePos_) {
 			wordPos = wordPos_;
-			bitPos = bitPos_;
+			bytePos = bytePos_;
 		}
 
 		void acceptCodePoint(int cp) {
-			int blen = Utf8Helper.encodedBitLength(cp);
+			int blen = Utf8Helper.encodedByteLength(cp);
 			long w = Utf8Helper.encodeCodepoint(cp, blen);
-			int wrem = 56 - bitPos;
+			int wrem = 7 - bytePos;
 
-			value[wordPos] |= w << (bitPos + 8);
-			bitPos += blen;
-			wordPos += bitPos / 56;
-			bitPos %= 56;
+			value[wordPos] |= w << ((bytePos + 1) << 3);
+			bytePos += blen;
+			wordPos += bytePos / 7;
+			bytePos %= 7;
 
 			if (wrem < blen)
-				value[wordPos] = (w >>> wrem) << 8;
+				value[wordPos] = (w >>> (wrem << 3)) << 8;
 		}
 
 		void delimit() {
 			if (wordPos < value.length)
-				value[wordPos] |=  1L << (bitPos >> 3);
+				value[wordPos] |=  1L << bytePos;
 			else
 				value[value.length - 1] |= 0x80L;
 		}
 
 
 		private int wordPos;
-		private int bitPos;
+		private int bytePos;
 	}
 
 	private class ByteRange {
-		ByteRange(int wordPos_, int bytePos, int byteLength) {
+		ByteRange(int wordPos_, int bytePos_, int length_) {
 			wordPos = wordPos_;
-			bitPos = bytePos << 3;
-			bitLength = byteLength << 3;
+			bytePos = bytePos_;
+			length = length_;
 		}
 
 		void forEachCodePoint(IntConsumer cons) {
-			while (bitLength > 0)
+			while (length > 0)
 				cons.accept(nextCodePoint());
 		}
 
-		ByteBuffer toByteBuffer() {
-			var cap = bitLength >> 64;
-			if ((bitLength & 0x3f) != 0)
-				cap++;
-
-			var lim = bitLength >> 3;
-			var b = ByteBuffer.allocate(cap << 3).order(
+		ByteBuffer toByteBuffer() {;
+			var b = ByteBuffer.allocate(
+				length + 8
+			).order(
 				ByteOrder.LITTLE_ENDIAN
 			);
+			var length_ = length;
 
-			if (bitPos > 0) {
-				var wrem = Math.min(56 - bitPos, bitLength);
+			if (bytePos > 0) {
+				var wrem = Math.min(7 - bytePos, length);
 				subWordToByteBuffer(
-					b, value[wordPos], bitPos, wrem
+					b, value[wordPos], bytePos, wrem
 				);
-				bitPos += wrem;
-				bitLength -= wrem;
-				if (bitPos == 56) {
-					bitPos = 0;
+				bytePos += wrem;
+				length -= wrem;
+				if (bytePos == 7) {
+					bytePos = 0;
 					wordPos++;
 				}
 			}
 
-			for (; bitLength >= 56; bitLength -= 56) {
+			for (; length >= 7; length -= 7) {
 				wordToByteBuffer(b, value[wordPos]);
 				wordPos++;
 			}
 
-			if (bitLength > 0) {
+			if (length > 0) {
 				subWordToByteBuffer(
-					b, value[wordPos], 0, bitLength
+					b, value[wordPos], 0, length
 				);
-				bitPos += bitLength;
-				bitLength = 0;
+				bytePos += length;
+				length = 0;
 			}
 
 			b.position(0);
-			b.limit(lim);
+			b.limit(length_);
 			return b;
 		}
 
 		private int nextCodePoint() {
-			long w = value[wordPos] >>> (bitPos + 8);
-			int wrem = 56 - bitPos;
-			int blen = Utf8Helper.codepointBits((byte)w);
+			long w = value[wordPos] >>> ((bytePos + 1) << 3);
+			int wrem = 7 - bytePos;
+			int blen = Utf8Helper.codepointBytes((byte)w);
 
-			bitLength -= blen;
-			bitPos += blen;
-			wordPos += bitPos / 56;
-			bitPos %= 56;
+			length -= blen;
+			bytePos += blen;
+			wordPos += bytePos / 7;
+			bytePos %= 7;
 
-			if (blen > wrem) {
-				w &= (1L << wrem) - 1L;
+			if (blen > wrem)
 				w |= (
 					(value[wordPos] >>> 8)
-					& ((1L << (blen - wrem)) - 1L)
-				) << wrem;
-			}
+					& ((1L << ((blen - wrem) << 3)) - 1L)
+				) << (wrem << 3);
 
 			return Utf8Helper.decodeCodepoint(w);
 		}
 
 		private int wordPos;
-		private int bitPos;
-		private int bitLength;
+		private int bytePos;
+		private int length;
 	}
 
 	private static interface ByteRangeConsumer<E extends Exception> {

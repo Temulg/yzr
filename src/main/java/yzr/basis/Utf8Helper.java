@@ -10,7 +10,7 @@ public class Utf8Helper {
 	private Utf8Helper() {
 	}
 
-	public static int encodedBitLength(int cp) {
+	public static int encodedByteLength(int cp) {
 		final int lz = Integer.numberOfLeadingZeros(cp) - 11;
 		if (lz < 0)
 			throw new IllegalArgumentException(String.format(
@@ -21,7 +21,7 @@ public class Utf8Helper {
 		return CODEPOINT_BITS_TO_LENGTH[lz];
 	}
 
-	public static int encodedBitLength(
+	public static int encodedByteLength(
 		CharSequence src, int srcOffset, int srcLength
 	) {
 		int seqLength = 0;
@@ -37,20 +37,20 @@ public class Utf8Helper {
 					hs = ch;
 					isSimple = false;
 				} else {
-					seqLength += encodedBitLength(ch);
+					seqLength += encodedByteLength(ch);
 				}
 			} else {
 				if (Character.isLowSurrogate(ch)) {
-					seqLength += encodedBitLength(
+					seqLength += encodedByteLength(
 						Character.toCodePoint(hs, ch)
 					);
 					isSimple = true;
 				} else {
-					seqLength += encodedBitLength(hs);
+					seqLength += encodedByteLength(hs);
 					if (Character.isHighSurrogate(ch)) {
 						hs = ch;
 					} else {
-						seqLength += encodedBitLength(
+						seqLength += encodedByteLength(
 							ch
 						);
 						isSimple = true;
@@ -60,23 +60,23 @@ public class Utf8Helper {
 		}
 
 		if (!isSimple)
-			seqLength += encodedBitLength(hs);
+			seqLength += encodedByteLength(hs);
 
 		return seqLength;
 	}
 
 	public static long encodeCodepoint(int cp, int encLen) {
 		switch (encLen) {
-		case 8:
+		case 1:
 			return cp;
-		case 16:
+		case 2:
 			return (long)((cp >>> 6) | 0xc0)
 				| ((long)((cp & 0x3f) | 0x80) << 8);
-		case 24:
+		case 3:
 			return (long)((cp >>> 12) | 0xe0)
 				| ((long)(((cp >>> 6) & 0x3f) | 0x80) << 8)
 				| ((long)((cp & 0x3f) | 0x80) << 16);
-		case 32:
+		case 4:
 			return (long)((cp >>> 18) | 0xf0)
 				| ((long)(((cp >>> 12) & 0x3f) | 0x80) << 8)
 				| ((long)(((cp >>> 6) & 0x3f) | 0x80) << 16)
@@ -88,8 +88,8 @@ public class Utf8Helper {
 		}
 	}
 
-	public static int codepointBits(byte b) {
-		int rv = UTF8_LEAD_TO_BITS[b & 0xff];
+	public static int codepointBytes(byte b) {
+		int rv = UTF8_LEAD_TO_BYTES[b & 0xff];
 		if (rv < 0)
 			throw new IllegalStateException(
 				"invalid UTF-8 sequence"
@@ -98,18 +98,18 @@ public class Utf8Helper {
 	}
 
 	public static int decodeCodepoint(long w) {
-		switch (UTF8_LEAD_TO_BITS[(int)w & 0xff]) {
-		case 8:
+		switch (UTF8_LEAD_TO_BYTES[(int)w & 0xff]) {
+		case 1:
 			return (int)(w & 0x7f);
-		case 16:
+		case 2:
 			return (int)(((w & 0x1f) << 6) | ((w >> 8) & 0x3f));
-		case 24:
+		case 3:
 			return (int)(
 				((w & 0xf) << 12)
 				| (((w >> 8) & 0x3f) << 6)
 				| ((w >> 16) & 0x3f)
 			);
-		case 32:
+		case 4:
 			return (int)(
 				((w & 7) << 18)
 				| (((w >> 8) & 0x3f) << 12)
@@ -124,28 +124,28 @@ public class Utf8Helper {
 	}
 
 	private static final byte[] CODEPOINT_BITS_TO_LENGTH = new byte[] {
-		32, 32, 32, 32, 32,
-		24, 24, 24, 24, 24,
-		16, 16, 16, 16,
-		8, 8, 8, 8, 8, 8, 8, 8
+		4, 4, 4, 4, 4,
+		3, 3, 3, 3, 3,
+		2, 2, 2, 2,
+		1, 1, 1, 1, 1, 1, 1, 1
 	};
 
-	private static final byte[] UTF8_LEAD_TO_BITS = new byte[] {
-		8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-		8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-		8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-		8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-		8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-		8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-		8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-		8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+	private static final byte[] UTF8_LEAD_TO_BYTES = new byte[] {
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-		16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
-		16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
-		24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24,
-		32, 32, 32, 32, 32, 32, 32, 32, -1, -1, -1, -1, -1, -1, -1, -1
+		2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+		2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+		3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+		4, 4, 4, 4, 4, 4, 4, 4, -1, -1, -1, -1, -1, -1, -1, -1
 	};
 }

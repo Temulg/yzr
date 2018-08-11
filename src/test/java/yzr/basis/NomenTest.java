@@ -198,6 +198,7 @@ public class NomenTest {
 		var n01 = n0.cat(n1);
 		var n02 = n0.cat(n2);
 
+		var common = n0.cat(n1.commonPrefix(n2));
 		var nc1 = n01.commonPrefix(n02);
 		var nc2 = n02.commonPrefix(n01);
 
@@ -206,13 +207,21 @@ public class NomenTest {
 			sb.append('/').append(s);
 		});
 
+		int sz = Math.min(s1.size(), s2.size());
+		for (int pos = 0; pos < sz; pos++) {
+			if (s1.get(pos).equals(s2.get(pos)))
+				sb.append('/').append(s1.get(pos));
+			else
+				break;
+		}
+
 		// Compare as Object
-		assertEquals(nc1, n0);
-		assertEquals(nc2, n0);
+		assertEquals(nc1, common);
+		assertEquals(nc2, common);
 
 		// Compare as Iterable
-		Assert.assertEquals(nc1, n0);
-		Assert.assertEquals(nc2, n0);
+		Assert.assertEquals(nc1, common);
+		Assert.assertEquals(nc2, common);
 		Assert.assertEquals(nc1.toString(), sb.toString());
 		Assert.assertEquals(nc2.toString(), sb.toString());
 	}
