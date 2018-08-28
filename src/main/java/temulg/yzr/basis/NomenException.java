@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-package yzr.basis;
+package temulg.yzr.basis;
 
 public class NomenException {
 	private NomenException() {

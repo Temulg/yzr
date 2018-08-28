@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-package yzr;
+package temulg.yzr;
 
 public class Application {
 	public static void main(String... args) {

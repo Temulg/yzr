@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-package yzr.basis;
+package temulg.yzr.basis;
 
 import java.util.ArrayList;
 import java.util.Arrays;

@@ -27,7 +27,7 @@ eclipse {
 
 jar {
 	manifest {
-		attributes 'Main-Class': 'yzr.Application'
+		attributes 'Main-Class': 'temulg.yzr.Application'
 	}
 }
 

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-package yzr.basis;
+package temulg.yzr.basis;
 
 import java.util.Arrays;
 import java.util.Iterator;
@@ -755,7 +755,6 @@ public class Nomen implements Iterable<Nomen> {
 			else
 				value[value.length - 1] |= 0x80L;
 		}
-
 
 		private int wordPos;
 		private int bytePos;
