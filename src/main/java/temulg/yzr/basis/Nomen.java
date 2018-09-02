@@ -7,6 +7,7 @@
 package temulg.yzr.basis;
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.nio.ByteOrder;
 import java.nio.ByteBuffer;
@@ -59,6 +60,10 @@ public class Nomen implements Iterable<Nomen> {
 		ins.delimit();
 
 		return n;
+	}
+
+	public static Comparator<Nomen> lexicographicOrder() {
+		return LEXICOGRAPHIC_ORDER;
 	}
 
 	public boolean isEmpty() {
@@ -834,6 +839,55 @@ public class Nomen implements Iterable<Nomen> {
 		private int bytePos;
 		private int length;
 	}
+
+	public static final Comparator<
+		Nomen
+	> LEXICOGRAPHIC_ORDER = new Comparator<>() {
+		@Override
+		public int compare(Nomen l, Nomen r) {
+			int clen = Math.min(l.value.length, r.value.length);
+
+			for (int pos = 0; pos < clen; pos++) {
+				if (l.value[pos] == r.value[pos])
+					continue;
+
+				int res = Long.signum(reorderWord(
+					l.value[pos]
+				) - reorderWord(r.value[pos]));
+				if (res != 0)
+					return res;
+			}
+
+			return Integer.signum(l.value.length - r.value.length);
+		}
+
+		private long reorderWord(long w) {
+			long rw = ((w >> 8) & 0xff) << 54;
+			rw |= ((w >>> 16) & 0xff) << 45;
+			rw |= ((w >> 24) & 0xff) << 36;
+			rw |= ((w >> 32) & 0xff) << 27;
+			rw |= ((w >> 40) & 0xff) << 18;
+			rw |= ((w >> 48) & 0xff) << 9;
+			rw |= w >>> 56;
+			rw |= EXPANDED_SEP_MASK;
+
+			long sep = (long)(ByteHelper.reverse(
+				(byte)w
+			)) >>> 1;
+			sep |= sep << 8;
+			sep |= sep << 16;
+			sep |= sep << 24;
+			sep |= sep << 32;
+			sep |= sep << 40;
+			sep |= sep << 48;
+			sep |= sep << 56;
+			sep &= EXPANDED_SEP_MASK;
+			return rw ^ sep;
+		}
+
+		private static final long EXPANDED_SEP_MASK
+		= 0x4020100804020100L;
+	};
 
 	private static interface ByteRangeConsumer<E extends Exception> {
 		void accept(ByteRange range) throws E;
