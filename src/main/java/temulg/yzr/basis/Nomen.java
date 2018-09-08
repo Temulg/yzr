@@ -18,19 +18,29 @@ import java.util.function.IntConsumer;
 import java.nio.charset.StandardCharsets;
 import java.nio.channels.WritableByteChannel;
 
+/*
+ * Nomen packs UTF-8 bytes and separator markers into 64 bit words, 7 bytes
+ * per word. Each separator marker is implied to precede the corresponding
+ * byte. 'z' marker is only allowed in the very last word of Nomen.
+ * 
+ * Word layout (b - UTF-8 byte, s - separator marker):
+ * MSB
+ * [ b0 ] [ b1 ] [ b2 ] [ b3 ] [ b4] [ b5 ] [ b6 ] [ s0 s1 s2 s3 s4 s5 s6 z]
+ *                                                                       LSB
+ */
 public class Nomen implements Iterable<Nomen> {
 	public static Nomen from(Iterable<CharSequence> elements) {
-		int byteCount = 0;
+		long bitCount = 0;
 		for (var el: elements)
-			byteCount += Utf8Helper.encodedByteLength(
+			bitCount += Utf8Helper.encodedBitLength(
 				el, 0, el.length()
 			);
 
-		var n = makeFromByteSize(byteCount);
+		var n = makeFromByteSize(bitCount >>> 3);
 		if (n.isEmpty())
 			return n;
 
-		var ins = n.new Inserter(0, 0);
+		var ins = n.new Inserter();
 
 		for (var el: elements) {
 			ins.delimit();
@@ -42,24 +52,30 @@ public class Nomen implements Iterable<Nomen> {
 	}
 
 	public static Nomen from(CharSequence... elements) {
-		return from(Arrays.asList(elements));
-	}
+		switch (elements.length) {
+		case 0:
+			return EMPTY;
+		case 1: {
+			long bitCount = Utf8Helper.encodedBitLength(
+				elements[0], 0, elements[0].length()
+			);
 
-	public static Nomen from(CharSequence element) {
-		var byteCount = Utf8Helper.encodedByteLength(
-			element, 0, element.length()
-		);
+			var n = makeFromByteSize(bitCount >>> 3);
+			if (n.isEmpty())
+				return n;
 
-		var n = makeFromByteSize(byteCount);
-		if (n.isEmpty())
+			var ins = n.new Inserter();
+			ins.delimit();
+			elements[0].codePoints().forEachOrdered(
+				ins::acceptCodePoint
+			);
+			ins.delimit();
+
 			return n;
-
-		var ins = n.new Inserter(0, 0);
-		ins.delimit();
-		element.codePoints().forEachOrdered(ins::acceptCodePoint);
-		ins.delimit();
-
-		return n;
+		}
+		default:
+			return from(Arrays.asList(elements));
+		}
 	}
 
 	public static Comparator<Nomen> lexicographicOrder() {
@@ -97,12 +113,44 @@ public class Nomen implements Iterable<Nomen> {
 	}
 
 	public String toString(String delim) {
-		StringBuilder sb = new StringBuilder();
+		var sb = new StringBuilder();
+		long ppos = 0;
 
-		forEachElementRange(range -> {
+		while (true) {
+			long pos = nextSepPos(ppos);
+
+			if (pos == ppos)
+				break;
+
 			sb.append(delim);
-			range.forEachCodePoint(sb::appendCodePoint);
-		});
+
+			int wordPos = (int)(ppos >>> 3);
+			int bitPos = (int)(ppos & 7) << 3;
+
+			do {
+				int wrem = 56 - bitPos;
+				int blen = Utf8Helper.codepointBits(
+					(byte)(value[wordPos] >>> wrem)
+				);
+
+				long w = value[wordPos] << bitPos;
+				if (blen >= wrem) {
+					w &= BYTE_MASK << bitPos;
+					wordPos++;
+					bitPos = blen - wrem;
+					if (bitPos > 0)
+						w |= value[wordPos] >>> wrem;
+				} else
+					bitPos += blen;
+
+				sb.appendCodePoint(
+					Utf8Helper.decodeCodepointBE(w, blen)
+				);
+
+				ppos = makePos(wordPos, bitPos >>> 3);
+			} while (ppos < pos);
+			ppos = pos;
+		}
 
 		return sb.toString();
 	}
@@ -120,14 +168,27 @@ public class Nomen implements Iterable<Nomen> {
 	public void toUtf8Channel(
 		WritableByteChannel ch, String delim_
 	) throws IOException {
+		if (isEmpty())
+			return;
+
 		var delim = ByteBuffer.wrap(delim_.getBytes(
 			StandardCharsets.UTF_8
 		));
-		forEachElementRangeEx(range -> {
+
+		long ppos = 0;
+		while (true) {
+			long pos = nextSepPos(ppos);
+
+			if (pos == ppos)
+				break;
+
 			ch.write(delim);
 			delim.rewind();
-			ch.write(range.toByteBuffer());
-		});
+			ch.write(rangeToByteBuffer(ppos, pos));
+
+			ppos = pos;
+		}
+
 	}
 
 	public Nomen cat(Nomen other) {
@@ -152,8 +213,8 @@ public class Nomen implements Iterable<Nomen> {
 			);
 		else {
 			n.value[wordPos - 1] = (
-				n.value[wordPos - 1] | 0x80
-			) ^ 0x80;
+				n.value[wordPos - 1] | 1
+			) ^ 1;
 			System.arraycopy(
 				other.value, 0, n.value, wordPos,
 				other.value.length
@@ -161,7 +222,7 @@ public class Nomen implements Iterable<Nomen> {
 		}
 
 		if (((bytePos + oz) % 7) == 0)
-			n.value[n.value.length - 1] |= 0x80;
+			n.value[n.value.length - 1] |= 1;
 
 		return n;
 	}
@@ -209,8 +270,8 @@ public class Nomen implements Iterable<Nomen> {
 				);
 			} else {
 				n.value[wordPos - 1] = (
-					n.value[wordPos - 1] | 0x80
-				) ^ 0x80;
+					n.value[wordPos - 1] | 1
+				) ^ 1;
 				System.arraycopy(
 					other.value, 0, n.value, wordPos,
 					other.value.length
@@ -222,9 +283,51 @@ public class Nomen implements Iterable<Nomen> {
 		}
 
 		if (bytePos == 0)
-			n.value[wordPos - 1] |= 0x80;
+			n.value[wordPos - 1] |= 1;
 
 		return n;
+	}
+
+	public boolean isPrefixOf(Nomen other) {
+		if (isEmpty() || other.isEmpty())
+			return true;
+
+		if (value.length > other.value.length)
+			return false;
+
+		int wordPos = 0;
+		for (; wordPos < value.length; wordPos++) {
+			if (value[wordPos] != other.value[wordPos])
+				break;
+		}
+
+		switch (value.length - wordPos) {
+		case 1:
+			break;
+		case 0:
+			if (other.value.length == value.length)
+				return true;
+			else {
+				wordPos--;
+				break;
+			}
+		default:
+			return false;
+		}
+
+		long w = value[wordPos];
+		int bytePos = 7 - ByteHelper.trailingZeros((byte)w);
+
+		if ((bytePos < 7) && (lastCommonSep(
+			w, other.value[wordPos]
+		) == bytePos))
+			return true;
+		else if ((other.value.length > value.length) && (
+			(other.value[wordPos + 1] & 0x80) != 0
+		))
+			return true;
+
+		return false;
 	}
 
 	public Nomen relativize(Nomen other) {
@@ -255,17 +358,17 @@ public class Nomen implements Iterable<Nomen> {
 		}
 
 		long w = value[wordPos];
-		int bytePos = 7 - ByteHelper.leadingZeros((byte)w);
+		int bytePos = 7 - ByteHelper.trailingZeros((byte)w);
 
 		if ((bytePos < 7) && (lastCommonSep(
 			w, other.value[wordPos]
 		) == bytePos)) {
 			return new Nomen(copyAlignByteRange(
-				other.value, wordPos, bytePos,
-				other.remainingByteSize(wordPos, bytePos)
+				other.value, makePos(wordPos, bytePos),
+				other.lastSepPos()
 			));
-		} else if ((other.value.length > value.length) && ((
-			other.value[wordPos + 1] & 0x1) != 0
+		} else if ((other.value.length > value.length) && (
+			(other.value[wordPos + 1] & 0x80) != 0
 		)) {
 			return makeFromOtherAligned(
 				other, wordPos + 1,
@@ -305,11 +408,11 @@ public class Nomen implements Iterable<Nomen> {
 		if (wordPos == s.value.length)
 			return s;
 
-		if ((s.value[wordPos] ^ l.value[wordPos]) == 0x80) {
+		if ((s.value[wordPos] ^ l.value[wordPos]) == 1) {
 			if ((
 				l.value.length > s.value.length
 			) && (
-				(l.value[wordPos + 1] & 0x1) != 0
+				(l.value[wordPos + 1] & 0x80) != 0
 			))
 				return s;
 		}
@@ -323,12 +426,12 @@ public class Nomen implements Iterable<Nomen> {
 				);
 			else if (bytePos == 0) {
 				var n = makeFromOtherAligned(s, 0, wordPos);
-				n.value[wordPos - 1] |= 0x80;
+				n.value[wordPos - 1] |= 1;
 				return n;
 			}
 
 			wordPos = goodWordPos;
-			bytePos = 7 - ByteHelper.leadingZeros(
+			bytePos = 7 - ByteHelper.trailingZeros(
 				(byte)s.value[wordPos]
 			);
 		}
@@ -340,17 +443,15 @@ public class Nomen implements Iterable<Nomen> {
 				);
 			else {
 				var n = makeFromOtherAligned(s, 0, wordPos);
-				n.value[wordPos - 1] |= 0x80;
+				n.value[wordPos - 1] |= 1;
 				return n;
 			}
 		}
 
-		if (bytePos > 0)
-			return new Nomen(new long[] {
+		return (bytePos > 0)
+			? new Nomen(new long[] {
 				adjustLastSep(s.value[0], bytePos)
-			});
-		else
-			return EMPTY;
+			}) : EMPTY;
 	}
 
 	public Nomen subNomen(int first) {
@@ -373,17 +474,17 @@ public class Nomen implements Iterable<Nomen> {
 		if (wordPos < 0)
 			throw new IndexOutOfBoundsException(first);
 
-		int bytePos = ByteHelper.trailingNthOne(
+		int bytePos = ByteHelper.leadingNthOne(
 			(byte)value[wordPos], first - elemCount
 		);
 
-		int len = remainingByteSize(wordPos, bytePos);
-		if (len == 0)
+		long pos = makePos(wordPos, bytePos);
+		long last = lastSepPos();
+
+		if (pos >= last)
 			throw new IndexOutOfBoundsException(first);
 
-		return new Nomen(copyAlignByteRange(
-			value, wordPos, bytePos, len
-		));
+		return new Nomen(copyAlignByteRange(value, pos, last));
 	}
 
 	public Nomen subNomen(int first, int last) {
@@ -404,27 +505,22 @@ public class Nomen implements Iterable<Nomen> {
 		if (wordPos < 0)
 			throw new IndexOutOfBoundsException(first);
 
-		int bytePos = ByteHelper.trailingNthOne(
+		int bytePos = ByteHelper.leadingNthOne(
 			(byte)value[wordPos], first - elemCount
 		);
 
-		int len = 0;
-		int wp = wordPos;
-		int bp = bytePos;
-		for (; first < last; first++) {
-			int nl = nextSepOffset(wp, bp);
-			if (nl == 0)
-				throw new IndexOutOfBoundsException(first);
+		long firstPos = makePos(wordPos, bytePos);
+		long lastPos = firstPos;
 
-			len += nl;
-			bp += nl;
-			wp += bp / 7;
-			bp %= 7;
+		for (; first < last; first++) {
+			long pos = nextSepPos(lastPos);
+			if (pos == lastPos)
+				throw new IndexOutOfBoundsException(last);
+
+			lastPos = pos;
 		}
 
-		return new Nomen(copyAlignByteRange(
-			value, wordPos, bytePos, len
-		));
+		return new Nomen(copyAlignByteRange(value, firstPos, lastPos));
 	}
 
 	public Nomen get(int pos) {
@@ -433,22 +529,19 @@ public class Nomen implements Iterable<Nomen> {
 
 	@Override
 	public void forEach(Consumer<? super Nomen> cons) {
-		int bytePos = 0;
-		int last = byteSize();
+		long ppos = 0;
 
-		while (bytePos < last) {
-			int wp = bytePos / 7;
-			int bp = bytePos % 7;
-			int len = nextSepOffset(wp, bp);
+		while (true) {
+			long pos = nextSepPos(ppos);
 
-			if (len == 0)
+			if (pos == ppos)
 				break;
 
 			cons.accept(new Nomen(copyAlignByteRange(
-				value, wp, bp, len
+				value, ppos, pos
 			)));
 
-			bytePos += len;
+			ppos = pos;
 		}
 	}
 
@@ -457,28 +550,26 @@ public class Nomen implements Iterable<Nomen> {
 		return new Iterator<Nomen>() {
 			@Override
 			public boolean hasNext() {
-				return bytePos < last;
+				return ppos < last;
 			}
 
 			@Override
 			public Nomen next() {
-				int wp = bytePos / 7;
-				int bp = bytePos % 7;
-				int len = nextSepOffset(wp, bp);
-				if (len == 0)
+				long pos = nextSepPos(ppos);
+				if (pos == ppos)
 					return EMPTY;
 
 				var n = new Nomen(copyAlignByteRange(
-					value, wp, bp, len
+					value, ppos, pos
 				));
 
-				bytePos += len;
+				ppos = pos;
 
 				return n;
 			}
 
-			private int bytePos = 0;
-			private final int last = byteSize();
+			private long ppos = 0;
+			private final long last = lastSepPos();
 		};
 	}
 
@@ -494,157 +585,155 @@ public class Nomen implements Iterable<Nomen> {
 		s.append(']');
 	}
 
-	private void forEachElementRange(Consumer<ByteRange> cons) {
-		if (isEmpty())
-			return;
-
-		int wordPos = 0;
-		int bytePos = 0;
-
-		for (
-			int len = nextSepOffset(wordPos, bytePos);
-			len != 0;
-			len = nextSepOffset(wordPos, bytePos)
-		) {
-			cons.accept(new ByteRange(wordPos, bytePos, len));
-			bytePos += len;
-			wordPos += bytePos / 7;
-			bytePos = bytePos % 7;
-		}
+	private static long makePos(int wordPos, int bytePos) {
+		return (((long)wordPos) << 3) | (bytePos & 7);
 	}
 
-	private <E extends Exception> void forEachElementRangeEx(
-		ByteRangeConsumer<E> cons
-	) throws E {
-		if (isEmpty())
-			return;
+	private long nextSepPos(long ppos) {
+		int wordPos = (int)(ppos >>> 3);
+		int bytePos = (int)(ppos & 7);
 
-		int wordPos = 0;
-		int bytePos = 0;
-
-		for (
-			int len = nextSepOffset(wordPos, bytePos);
-			len != 0;
-			len = nextSepOffset(wordPos, bytePos)
-		) {
-			cons.accept(new ByteRange(wordPos, bytePos, len));
-			bytePos += len;
-			wordPos += bytePos / 7;
-			bytePos = bytePos % 7;
-		}
-	}
-
-	private int nextSepOffset(int wordPos, int bytePos) {
 		if (wordPos == value.length)
-			return 0;
+			return ppos;
 
 		bytePos++;
 
 		if (bytePos == 7) {
-			wordPos++;
-			if (wordPos == value.length) {
-				if ((value[wordPos - 1] & 0x80) !=0)
-					return 1;
-				else
-					return 0;
-			}
+			if ((wordPos + 1) == value.length)
+				return ppos + (value[wordPos] & 1);
 
 			bytePos = 0;
-		}
-
-		byte w = (byte)value[wordPos];
-		w &= (byte)~((1 << bytePos) - 1);
-		if (w != 0)
-			return ByteHelper.trailingZeros(w) - bytePos + 1;
-
-		bytePos = 8 - bytePos;
-		wordPos++;
-		if (wordPos == value.length)
-			return 0;
-
-		while (true) {
-			w = (byte)value[wordPos];
-			if (w != 0)
-				return bytePos + ByteHelper.trailingZeros(w);
-
-			bytePos += 7;
 			wordPos++;
 		}
+
+		byte sep = (byte)value[wordPos];
+		sep &= (byte)(0xff >>> bytePos);
+		if (sep != 0)
+			return makePos(wordPos, ByteHelper.leadingZeros(sep));
+
+		wordPos++;
+		if (wordPos == value.length)
+			return ppos;
+
+		while (true) {
+			sep = (byte)value[wordPos];
+			if (sep != 0)
+				return makePos(
+					wordPos, ByteHelper.leadingZeros(sep)
+				);
+
+			wordPos++;
+		}
+	}
+
+	private long lastSepPos() {
+		if (value.length > 0)
+			return makePos(
+				value.length - 1,
+				7 - ByteHelper.trailingZeros(
+					(byte)value[value.length - 1]
+				)
+			);
+		else
+			return 0;
+	}
+
+	private ByteBuffer rangeToByteBuffer(long begin, long end) {
+		int wb = (int)(begin >>> 3);
+		int we = (int)(end >>> 3);
+
+		var b = ByteBuffer.allocate((we - wb + 1) << 3).order(
+			ByteOrder.BIG_ENDIAN
+		);
+
+		if (wb == we) {
+			b.putLong(0, value[wb] << ((begin & 7) << 3));
+			b.limit((int)((end & 7) - (begin & 7)));
+			return b;
+		}
+
+		int bytePos = (int)(begin & 7);
+
+		if (bytePos > 0) {
+			b.putLong(0, value[wb] << (bytePos << 3));
+			b.position(7 - bytePos);
+			wb++;
+		}
+
+		for (; wb < we; wb++) {
+			b.putLong(b.position(), value[wb]);
+			b.position(b.position() + 7);
+		}
+
+		bytePos = (int)(end & 7);
+		if (bytePos > 0) {
+			b.putLong(b.position(), value[we]);
+			b.position(b.position() + bytePos);
+		}
+
+		b.flip();
+		return b;
 	}
 
 	private int byteSize() {
-		return value.length > 0
-			? value.length * 7 - ByteHelper.leadingZeros(
-				(byte)value[value.length - 1]
-			) : 0;
-	}
-
-	private int remainingByteSize(
-		int wordPos, int bytePos
-	) {
-		return (value.length - wordPos) * 7 - bytePos
-			- ByteHelper.leadingZeros(
+		if (value.length > 0) {
+			return 7 * value.length - ByteHelper.trailingZeros(
 				(byte)value[value.length - 1]
 			);
+		} else {
+			return 0;
+		}
 	}
 
 	private static int lastCommonSep(long w0, long w1) {
-		if ((byte)(w0 & w1)== 0)
+		if ((byte)(w0 & w1) == 0)
 			return -1;
 
 		var diff = w0 ^ w1;
-		var sep = diff & 0xff;
-		var sym = (Long.numberOfTrailingZeros(diff ^ sep) >>> 3) - 1;
+		byte sep = (byte)(diff & 0xff);
+		var byteCount = Long.numberOfLeadingZeros(diff) >>> 3;
 
-		var symMask = (1 << (sym + 1)) - 1;
+		var byteMask = (0xff00 >> (byteCount + 1)) & 0xff;
 
 		if (sep == 0)
-			return 7 - ByteHelper.leadingZeros(
-				(byte)(w0 & symMask)
+			return 7 - ByteHelper.trailingZeros(
+				(byte)(w0 & byteMask)
 			);
 
-		var sepMask = (1 << ByteHelper.trailingZeros((byte)sep)) - 1;
-		sep = w0 & sepMask & symMask;
-		return 7 - ByteHelper.leadingZeros((byte)sep);
+		var sepMask = (
+			0xff00 >> (7 - ByteHelper.trailingZeros(sep))
+		) & 0xff;
+
+		sep = (byte)(w0 & sepMask & byteMask);
+		return 7 - ByteHelper.trailingZeros(sep);
 	}
 
 	private static long adjustLastSep(long w, int bytePos) {
-		var sep = (w & 0xff) & ((1 << (bytePos + 1)) - 1);
-		var mask = ((1L << (bytePos << 3)) - 1) << 8;
-		return w & mask | sep;
+		var sep = (w & 0xff) & (0xff00 >> (bytePos + 1));
+		var mask = BYTE_MASK << ((7 - bytePos) << 3);
+		return (w & mask) | sep;
 	}
 
-	private static void subWordToByteBuffer(
-		ByteBuffer dst, long w, int bytePos, int length
-	) {
-		w >>>= (bytePos + 1) << 3;
-		dst.putLong(w);
-		dst.position(dst.position() - 8 + length);
+	private static long trimWord(long w, int bytePos) {
+		long sep = w & (0xff00L >>> (bytePos + 1)) & 0xff;
+		return (w & (BYTE_MASK << ((7 - bytePos) << 3))) | sep;
 	}
 
-	private static void wordToByteBuffer(ByteBuffer dst, long w) {
-		dst.putLong(w >>> 8);
-		dst.position(dst.position() - 1);
+	private static long shiftWordRight(long w, int byteShift) {
+		long sep = (w >>> byteShift) & (0xff >>> byteShift) | 1;
+		return ((w >>> (byteShift << 3)) & BYTE_MASK) | sep ^ 1;
 	}
 
-	private static long shiftWordRight(long w, int bytePos) {
-		var sep = (w & 0xff) >>> bytePos;
-		w >>>= (bytePos + 1) << 3;
-		w <<= 8;
-		return w | sep;
+	private static long shiftWordLeft(long w, int byteShift) {
+		long sep = (w << byteShift) & 0xff;
+		int bitShift = byteShift << 3;
+		return ((w << bitShift) & (BYTE_MASK << bitShift)) | sep;
 	}
 
-	private static long shiftWordLeft(long w, int bytePos) {
-		var sep = w << bytePos;
-		w >>>= 8;
-		w <<= (bytePos + 1) << 3;
-		return w | (sep & 0xff);
-	}
-
-	private static Nomen makeFromByteSize(int byteSize) {
-		return new Nomen(
+	private static Nomen makeFromByteSize(long byteSize) {
+		return new Nomen(new long[(int)(
 			byteSize % 7 > 0 ? byteSize / 7 + 1 : byteSize / 7
-		);
+		)]);
 	}
 
 	private static Nomen makeFromOtherAligned(
@@ -665,54 +754,74 @@ public class Nomen implements Iterable<Nomen> {
 	}
 
 	private static long[] copyAlignByteRange(
-		long[] src, int wordPos, int bytePos, int byteLen
+		long[] src, long begin, long end
 	) {
-		int dstLen = byteLen / 7;
-		int dstRem = byteLen % 7;
+		int wb = (int)(begin >>> 3);
+		int we = (int)(end >>> 3);
+		int offb = (int)(begin & 7);
+		int offe = (int)(end & 7);
 
-		if (dstRem > 0)
-			dstLen++;
+		if (wb == we) {
+			long[] dst = new long[] {
+				shiftWordLeft(
+					trimWord(src[wb], offe), offb
+				)
+			};
+			if ((offe - offb) == 7)
+				dst[0] |= 1;
 
-		long[] dst = new long[dstLen];
+			return dst;
+		}
 
-		if (bytePos != 0) {
-			long w = shiftWordRight(src[wordPos++], bytePos);
-			byteLen -= 7 - bytePos;
-			int dstPos = 0;
+		int tailFlag = offe > offb ? 1 : 0;
+		long[] dst = new long[we - wb + tailFlag];
 
-			for (; byteLen > 0; byteLen -= 7) {
-				w |= shiftWordLeft(src[wordPos], 7 - bytePos);
-				w = (w | 0x80) ^ 0x80;
-				dst[dstPos++] = w;
-				w = shiftWordRight(src[wordPos++], bytePos);
+		if (offb > 0) {
+			int pos = 0;
+			long w = shiftWordLeft(src[wb], offb);
+
+			for (; pos < (dst.length - 1); pos++) {
+				wb++;
+				dst[pos] = w | shiftWordRight(
+					src[wb], 7 - offb
+				);
+				w = shiftWordLeft(src[wb], offb);
 			}
 
-			if (dstPos < dst.length)
-				dst[dstPos] = w;
-		} else
-			System.arraycopy(src, wordPos, dst, 0, dstLen);
+			if (tailFlag == 0)
+				dst[pos] = w | shiftWordRight(
+					trimWord(src[we], offe), 7 - offb
+				);
+			else
+				dst[pos] = shiftWordLeft(
+					trimWord(src[we], offe), offb
+				);
 
-		if (dstRem > 0) {
-			long mask = ((1L << (dstRem << 3)) - 1) << 8;
-			mask |= dst[dstLen - 1] & ((1L << dstRem) - 1);
-			dst[dstLen - 1] &= mask;
-			dst[dstLen - 1] |= 1L << dstRem;
-		} else
-			dst[dstLen - 1] |= 0x80;
+			if (offb == offe)
+				dst[pos] |= 1;
+		} else {
+			System.arraycopy(src, wb, dst, 0, dst.length);
+			if (offe > 0)
+				dst[dst.length - 1] = trimWord(
+					dst[dst.length - 1], offe
+				);
+			else
+				dst[dst.length - 1] |= 1;
+		}
 
 		return dst;
 	}
 
 	private static void copyShiftByteRange(
-		long[] dst, int wordPos, int bytePos, long[] src
+		long[] dst, int wordPos, int byteShift, long[] src
 	) {
-		int diff = 7 - bytePos;
-		long w = shiftWordLeft(src[0], bytePos);
-		dst[wordPos++] |= (w | 0x80) ^ 0x80;
+		int diff = 7 - byteShift;
+		long w = shiftWordRight(src[0], byteShift);
+		dst[wordPos++] |= w;
 		int srcPos = 0;
 
 		while (true) {
-			w = shiftWordRight(src[srcPos++], diff);
+			w = shiftWordLeft(src[srcPos++], diff);
 			if (srcPos == src.length) {
 				if (wordPos < dst.length)
 					dst[wordPos] = w;
@@ -720,14 +829,9 @@ public class Nomen implements Iterable<Nomen> {
 				return;
 			}
 
-			w |= shiftWordLeft(src[srcPos], bytePos);
-			w = (w | 0x80) ^ 0x80;
+			w |= shiftWordRight(src[srcPos], byteShift);
 			dst[wordPos++] = w;
 		}
-	}
-
-	private Nomen(int wordLen) {
-		value = new long[wordLen];
 	}
 
 	private Nomen(long[] value_) {
@@ -735,165 +839,129 @@ public class Nomen implements Iterable<Nomen> {
 	}
 
 	private class Inserter {
-		Inserter(int wordPos_, int bytePos_) {
-			wordPos = wordPos_;
-			bytePos = bytePos_;
-		}
-
 		void acceptCodePoint(int cp) {
-			int blen = Utf8Helper.encodedByteLength(cp);
-			long w = Utf8Helper.encodeCodepoint(cp, blen);
-			int wrem = 7 - bytePos;
+			int blen = Utf8Helper.encodedBitLength(cp);
+			long w = Utf8Helper.encodeCodepointBE(cp, blen);
 
-			value[wordPos] |= w << ((bytePos + 1) << 3);
-			bytePos += blen;
-			wordPos += bytePos / 7;
-			bytePos %= 7;
+			value[wordPos] |= (w >>> bitPos) & BYTE_MASK;
+			bitPos += blen;
+			wordPos += bitPos / 56;
+			bitPos %= 56;
 
-			if (wrem < blen)
-				value[wordPos] = (w >>> (wrem << 3)) << 8;
+			if (bitPos > 0)
+				value[wordPos] |= w << (blen - bitPos);
 		}
 
 		void delimit() {
 			if (wordPos < value.length)
-				value[wordPos] |=  1L << bytePos;
+				value[wordPos] |= 0x80 >>> (bitPos >> 3);
 			else
-				value[value.length - 1] |= 0x80L;
+				value[value.length - 1] |= 1;
 		}
 
-		private int wordPos;
-		private int bytePos;
-	}
-
-	private class ByteRange {
-		ByteRange(int wordPos_, int bytePos_, int length_) {
-			wordPos = wordPos_;
-			bytePos = bytePos_;
-			length = length_;
-		}
-
-		void forEachCodePoint(IntConsumer cons) {
-			while (length > 0)
-				cons.accept(nextCodePoint());
-		}
-
-		ByteBuffer toByteBuffer() {;
-			var b = ByteBuffer.allocate(
-				length + 8
-			).order(
-				ByteOrder.LITTLE_ENDIAN
-			);
-			var length_ = length;
-
-			if (bytePos > 0) {
-				var wrem = Math.min(7 - bytePos, length);
-				subWordToByteBuffer(
-					b, value[wordPos], bytePos, wrem
-				);
-				bytePos += wrem;
-				length -= wrem;
-				if (bytePos == 7) {
-					bytePos = 0;
-					wordPos++;
-				}
-			}
-
-			for (; length >= 7; length -= 7) {
-				wordToByteBuffer(b, value[wordPos]);
-				wordPos++;
-			}
-
-			if (length > 0) {
-				subWordToByteBuffer(
-					b, value[wordPos], 0, length
-				);
-				bytePos += length;
-				length = 0;
-			}
-
-			b.position(0);
-			b.limit(length_);
-			return b;
-		}
-
-		private int nextCodePoint() {
-			long w = value[wordPos] >>> ((bytePos + 1) << 3);
-			int wrem = 7 - bytePos;
-			int blen = Utf8Helper.codepointBytes((byte)w);
-
-			length -= blen;
-			bytePos += blen;
-			wordPos += bytePos / 7;
-			bytePos %= 7;
-
-			if (blen > wrem)
-				w |= (
-					(value[wordPos] >>> 8)
-					& ((1L << ((blen - wrem) << 3)) - 1L)
-				) << (wrem << 3);
-
-			return Utf8Helper.decodeCodepoint(w);
-		}
-
-		private int wordPos;
-		private int bytePos;
-		private int length;
+		private int wordPos = 0;
+		private int bitPos = 0;
 	}
 
 	public static final Comparator<
 		Nomen
-	> LEXICOGRAPHIC_ORDER = new Comparator<>() {
+	> LEXICOGRAPHIC_ORDER = new LexicographicComparator();
+
+	private static class LexicographicComparator
+	implements Comparator<Nomen> {
 		@Override
 		public int compare(Nomen l, Nomen r) {
-			int clen = Math.min(l.value.length, r.value.length);
+			int flag = (l.isEmpty() ? 0 : 1)
+				| (r.isEmpty() ? 0 : 2);
 
-			for (int pos = 0; pos < clen; pos++) {
+			switch (flag) {
+			case 0:
+				return 0;
+			case 1:
+				return 1;
+			case 2:
+				return -1;
+			}
+
+			if (l.value.length <= r.value.length)
+				return compareImpl(l, r);
+			else
+				return -compareImpl(r, l);
+		}
+
+		private int compareImpl(Nomen l, Nomen r) {
+			int last = l.value.length - 1;
+
+			for (int pos = 0; pos < last; pos++) {
 				if (l.value[pos] == r.value[pos])
 					continue;
 
-				int res = Long.signum(reorderWord(
+				return Long.signum(reorderWord(
 					l.value[pos]
 				) - reorderWord(r.value[pos]));
-				if (res != 0)
-					return res;
 			}
 
-			return Integer.signum(l.value.length - r.value.length);
+			if (l.value[last] != r.value[last]) {
+				long w0 = reorderLastWord(l.value[last]);
+				if (l.value.length < r.value.length) {
+					long w1 = reorderWord(r.value[last]);
+					int res = Long.signum(w0 - w1);
+					return res != 0 ? res : -1;
+				} else {
+					long w1 = reorderLastWord(
+						r.value[last]
+					);
+					return Long.signum(w0 - w1);
+				}
+			} else
+				return 0;
 		}
 
-		private long reorderWord(long w) {
-			long rw = ((w >> 8) & 0xff) << 54;
-			rw |= ((w >>> 16) & 0xff) << 45;
-			rw |= ((w >> 24) & 0xff) << 36;
-			rw |= ((w >> 32) & 0xff) << 27;
-			rw |= ((w >> 40) & 0xff) << 18;
-			rw |= ((w >> 48) & 0xff) << 9;
-			rw |= w >>> 56;
-			rw |= EXPANDED_SEP_MASK;
+		private static long reorderWordPartial(long w, long sepMask) {
+			long bmask = 0xff;
+			long rw = (w >>> 8) & bmask;
+			bmask <<= 9;
+			rw |= (w >>> 7) & bmask;
+			bmask <<= 9;
+			rw |= (w >>> 6) & bmask;
+			bmask <<= 9;
+			rw |= (w >>> 5) & bmask;
+			bmask <<= 9;
+			rw |= (w >>> 4) & bmask;
+			bmask <<= 9;
+			rw |= (w >>> 3) & bmask;
+			bmask <<= 9;
+			rw |= (w >>> 2) & bmask;
+			rw |= sepMask;
 
-			long sep = (long)(ByteHelper.reverse(
-				(byte)w
-			)) >>> 1;
+			long sep = w & 0xf7;
 			sep |= sep << 8;
 			sep |= sep << 16;
-			sep |= sep << 24;
 			sep |= sep << 32;
-			sep |= sep << 40;
-			sep |= sep << 48;
-			sep |= sep << 56;
-			sep &= EXPANDED_SEP_MASK;
+			sep >>= 1;
+			sep &= sepMask;
 			return rw ^ sep;
+		}
+
+		private static long reorderWord(long w) {
+			return reorderWordPartial(w, EXPANDED_SEP_MASK);
+		}
+
+		private static long reorderLastWord(long w) {
+			return reorderWordPartial(
+				w,
+				EXPANDED_SEP_MASK
+				<< (ByteHelper.trailingZeros((byte)w) * 9)
+			);
 		}
 
 		private static final long EXPANDED_SEP_MASK
 		= 0x4020100804020100L;
 	};
 
-	private static interface ByteRangeConsumer<E extends Exception> {
-		void accept(ByteRange range) throws E;
-	}
+	private static final long BYTE_MASK = ~0xffL;
 
-	public static final Nomen EMPTY = new Nomen(0);
+	public static final Nomen EMPTY = new Nomen(new long[0]);
 
 	private final long[] value;
 	private int hash;

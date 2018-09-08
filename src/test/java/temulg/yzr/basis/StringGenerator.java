@@ -58,8 +58,8 @@ public class StringGenerator {
 				var ls = r.nextInt(0, 16);
 				var out = new ArrayList<String>(ls);
 				for (; ls > 0; ls--)
-					out.add(RandomStringUtils.random(
-						r.nextInt(1, 16)
+					out.add(RandomStringUtils.random(// Alphanumeric(
+						r.nextInt(1, 32)
 					));
 
 				return out;

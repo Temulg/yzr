@@ -33,27 +33,27 @@ public class NomenTest {
 
 	@Test
 	public void constructBasic() throws Exception {
-		var n0 = Nomen.from(List.of());
+		var n0 = Nomen.from();
 		Assert.assertEquals(n0.toString(), "");
 		Assert.assertEquals(fromUtf8(n0), "");
 		Assert.assertEquals(n0.size(), 0);
 
-		var n1 = Nomen.from(List.of("abcdefg"));
+		var n1 = Nomen.from("abcdefg");
 		Assert.assertEquals(n1.toString(), "/abcdefg");
 		Assert.assertEquals(fromUtf8(n1), "/abcdefg");
 		Assert.assertEquals(n1.size(), 1);
 
-		var n2 = Nomen.from(List.of("abcdefgh"));
+		var n2 = Nomen.from("abcdefgh");
 		Assert.assertEquals(n2.toString(), "/abcdefgh");
 		Assert.assertEquals(fromUtf8(n2), "/abcdefgh");
 		Assert.assertEquals(n2.size(), 1);
 
-		var n3 = Nomen.from(List.of("abcdefg", "hijklmn"));
+		var n3 = Nomen.from("abcdefg", "hijklmn");
 		Assert.assertEquals(n3.toString(), "/abcdefg/hijklmn");
 		Assert.assertEquals(fromUtf8(n3), "/abcdefg/hijklmn");
 		Assert.assertEquals(n3.size(), 2);
 
-		var n4 = Nomen.from(List.of("abcdefgh", "i", "j"));
+		var n4 = Nomen.from("abcdefgh", "i", "j");
 		Assert.assertEquals(n4.toString(), "/abcdefgh/i/j");
 		Assert.assertEquals(fromUtf8(n4), "/abcdefgh/i/j");
 		Assert.assertEquals(n4.size(), 3);
@@ -238,6 +238,8 @@ public class NomenTest {
 		var n = n0.cat(n1);
 
 		var rel = n0.relativize(n);
+
+		Assert.assertTrue(n0.isPrefixOf(n));
 
 		// Compare as Object
 		assertEquals(rel, n1);

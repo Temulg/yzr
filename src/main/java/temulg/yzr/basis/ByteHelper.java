@@ -66,6 +66,50 @@ public class ByteHelper {
 		}
 	}
 
+	public static int leadingNthOne(byte b, int count) {
+		int pos = 0;
+
+		switch (count) {
+		case 7:
+			return (b == 0xff) ? 7 : -1;
+		case 6:
+			if (onesCount(b) > 6) {
+				return ((b & 0xf7) == 0xf7) ? 6 : 7;
+			} else
+				return -1;
+		case 5:
+			pos = leadingZeros(b);
+			if (pos > 2)
+				return -1;
+			b ^= 0x80 >>> pos;
+		case 4:
+			pos = leadingZeros(b);
+			if (pos > 3)
+				return -1;
+			b ^= 0x80 >>> pos;
+		case 3:
+			pos = leadingZeros(b);
+			if (pos > 4)
+				return -1;
+			b ^= 0x80 >>> pos;
+		case 2:
+			pos = leadingZeros(b);
+			if (pos > 5)
+				return -1;
+			b ^= 0x80 >>> pos;
+		case 1:
+			pos = leadingZeros(b);
+			if (pos > 6)
+				return -1;
+			b ^= 0x80 >>> pos;
+		case 0:
+			pos = leadingZeros(b);
+			return pos < 8 ? pos : -1;
+		default:
+			return -1;
+		}
+	}
+
 	public static byte reverse(byte b) {
 		return BIT_REVERSE[b & 0xff];
 	}
