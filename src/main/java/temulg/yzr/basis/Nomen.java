@@ -188,7 +188,6 @@ public class Nomen implements Iterable<Nomen> {
 
 			ppos = pos;
 		}
-
 	}
 
 	public Nomen cat(Nomen other) {
@@ -896,25 +895,29 @@ public class Nomen implements Iterable<Nomen> {
 				if (l.value[pos] == r.value[pos])
 					continue;
 
-				return Long.signum(reorderWord(
-					l.value[pos]
-				) - reorderWord(r.value[pos]));
+				long w0 = reorderWord(l.value[pos]);
+				long w1 = reorderWord(r.value[pos]);
+
+				return w0 > w1 ? 1 : -1;
 			}
 
 			if (l.value[last] != r.value[last]) {
 				long w0 = reorderLastWord(l.value[last]);
 				if (l.value.length < r.value.length) {
 					long w1 = reorderWord(r.value[last]);
-					int res = Long.signum(w0 - w1);
-					return res != 0 ? res : -1;
+
+					return w0 > w1 ? 1 : -1;
 				} else {
 					long w1 = reorderLastWord(
 						r.value[last]
 					);
-					return Long.signum(w0 - w1);
+
+					if (w0 != w1)
+						return w0 > w1 ? 1 : -1;
 				}
-			} else
-				return 0;
+			}
+
+			return 0;
 		}
 
 		private static long reorderWordPartial(long w, long sepMask) {
