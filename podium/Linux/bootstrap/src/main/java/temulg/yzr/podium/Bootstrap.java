@@ -1,18 +1,16 @@
 /*
  * Copyright (c) 2018 Alex Dubov <oakad@yahoo.com>
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 3 as publi-
- * shed by the Free Software Foundation.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-package yzr.base;
+package temulg.yzr.podium;
 
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 
-public class UnixBootstrap {
-	public UnixBootstrap() {
+public class Bootstrap {
+	public Bootstrap() {
 		System.out.println("bootstrap");
 		String encoding = System.getProperty(ENCODING_PROPERTY_NAME);
 		Charset cs = null;

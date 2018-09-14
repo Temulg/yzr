@@ -12,12 +12,15 @@
 #include <jni.h>
 
 struct app_state {
+	jint create_jvm(JavaVM **jvm);
+
+	void obtain_class_loader();
+	void load_bootstrap(int argc, char **argv);
+
 	JNIEnv *env;
 	jobject class_loader;
 	jclass app_class;
 	jobject app_obj;
 };
-
-void load_bootstrap(struct app_state *app, int argc, char **argv);
 
 #endif

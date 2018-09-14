@@ -1,5 +1,0 @@
-
-yzr [ exe [ fs.set
-	'*.[ch]'.glob
-	[- .entry bootstrap.h -> [- .depends ../embedded_class_data]]
-]]

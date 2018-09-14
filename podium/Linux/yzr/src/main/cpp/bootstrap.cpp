@@ -6,7 +6,7 @@
  * shed by the Free Software Foundation.
  */
 
-#include "bootstrap.h"
+#include "bootstrap.hpp"
 #include <string.h>
 
 static char const main_bootstrap_class[] = "yzr/base/UnixBootstrap";
@@ -19,11 +19,11 @@ struct class_data {
 
 static struct class_data bootstrap[] = {{
 	main_bootstrap_class,
-	#include "UnixBootstrap_data.h"
+	{}//#include "UnixBootstrap_data.h"
 }, {
 	NULL, NULL, 0
 }};
-
+/*
 static void start_bootstrap(struct app_state *app) {
 	jmethodID h = (*app->env)->GetMethodID(
 		app->env, app->app_class, "start", "()V"
@@ -81,13 +81,13 @@ static void configure_bootstrap(struct app_state *app, int argc, char **argv) {
 
 	start_bootstrap(app);
 }
-
-void load_bootstrap(
-	struct app_state *app, int argc, char **argv
+*/
+void app_state::load_bootstrap(
+	int argc, char **argv
 ) {
-	if (!app->class_loader)
+	if (!class_loader)
 		return;
-
+/*
 	for(struct class_data *cd = &bootstrap[0]; cd->name; cd++) {
 		jclass cls = (*app->env)->DefineClass(
 			app->env, cd->name, app->class_loader, cd->data,
@@ -96,10 +96,10 @@ void load_bootstrap(
 		if (cd->name == main_bootstrap_class)
 			app->app_class = cls;
 	}
-
-	if (!app->app_class)
+*/
+	if (!app_class)
 		return;
-
+/*
 	jmethodID ctor = (*app->env)->GetMethodID(
 		app->env, app->app_class, "<init>", "()V"
 	);
@@ -108,4 +108,5 @@ void load_bootstrap(
 
 	app->app_obj = (*app->env)->NewObject(app->env, app->app_class, ctor);
 	configure_bootstrap(app, argc, argv);
+*/
 }

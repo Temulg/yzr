@@ -1,0 +1,25 @@
+plugins {
+	id 'cpp-application'
+}
+
+//org.gradle.java.home
+
+application {
+}
+
+tasks.withType(CppCompile) {
+	compilerArgs = [
+		"-std=c++14",
+		"-I/opt/oracle-jdk-bin-10.0.1/include",
+		"-I/opt/oracle-jdk-bin-10.0.1/include/linux"
+	]
+}
+
+tasks.withType(LinkExecutable) {
+	linkerArgs = [
+		"-static-libstdc++",
+		"-L/opt/oracle-jdk-bin-10.0.1/lib/server",
+		"-Wl,-rpath,/opt/oracle-jdk-bin-10.0.1/lib/server",
+		"-ljvm"
+	]
+}
