@@ -11,16 +11,25 @@
 
 #include <jni.h>
 
-struct app_state {
-	jint create_jvm(JavaVM **jvm);
+struct ClassData {
+	jbyte const *data;
+	jsize size;
+	jsize compSize;
+};
 
-	void obtain_class_loader();
-	void load_bootstrap(int argc, char **argv);
+struct AppState {
+	jint createJvm(JavaVM **jvm);
+
+	void obtainClassLoader();
+	void loadBootstrap(int argc, char **argv);
+	void configureBootstrap(int argc, char **argv);
+	void startBootstrap();
+	bool callByteStringSetter(jmethodID h, char const *s);
 
 	JNIEnv *env;
-	jobject class_loader;
-	jclass app_class;
-	jobject app_obj;
+	jobject classLoader;
+	jclass appClass;
+	jobject appObj;
 };
 
 #endif

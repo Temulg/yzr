@@ -1,25 +1,41 @@
+import temulg.yzr.gradle.tasks.BootstrapEncoder;
+
 plugins {
 	id 'cpp-application'
 }
 
-//org.gradle.java.home
+def javaHome = org.gradle.internal.jvm.Jvm.current().javaHome
+
+task genBootstrap(
+	type: BootstrapEncoder,
+	dependsOn: ':podium:Linux:bootstrap:compileJava'
+) {
+	source tasks.getByPath(':podium:Linux:bootstrap:compileJava').outputs
+	headersDir = project.layout.buildDirectory.dir("generated/headers")
+}
 
 application {
+	privateHeaders.from = ['src/main/headers', genBootstrap.headersDir]
 }
 
 tasks.withType(CppCompile) {
 	compilerArgs = [
 		"-std=c++14",
-		"-I/opt/oracle-jdk-bin-10.0.1/include",
-		"-I/opt/oracle-jdk-bin-10.0.1/include/linux"
+		"-I${javaHome}/include",
+		"-I${javaHome}/include/linux"
 	]
 }
 
 tasks.withType(LinkExecutable) {
 	linkerArgs = [
 		"-static-libstdc++",
-		"-L/opt/oracle-jdk-bin-10.0.1/lib/server",
-		"-Wl,-rpath,/opt/oracle-jdk-bin-10.0.1/lib/server",
+		"-L${javaHome}/lib/server",
+		"-Wl,-rpath,${javaHome}/lib/server",
 		"-ljvm"
 	]
+}
+
+task install(type: Copy, dependsOn: 'linkRelease') {
+	from buildDir.toPath().resolve('exe/main/release')
+	into rootProject.projectDir.toPath().resolve("image/bin")
 }

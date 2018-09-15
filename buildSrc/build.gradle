@@ -9,6 +9,7 @@ repositories {
 }
 
 dependencies {
+	compile gradleApi()
 }
 
 eclipse {

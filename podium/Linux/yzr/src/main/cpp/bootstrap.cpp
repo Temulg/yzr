@@ -1,112 +1,82 @@
 /*
  * Copyright (c) 2018 Alex Dubov <oakad@yahoo.com>
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 3 as publi-
- * shed by the Free Software Foundation.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include "bootstrap.hpp"
 #include <string.h>
 
-static char const main_bootstrap_class[] = "yzr/base/UnixBootstrap";
+static char const MAIN_BOOTSTRAP_CLASS[] = "temulg/yzr/podium/Bootstrap";
 
-struct class_data {
-	char const *name;
-	jbyte const *data;
-	jsize data_size;
-};
+extern struct ClassData BOOTSTRAP[];
 
-static struct class_data bootstrap[] = {{
-	main_bootstrap_class,
-	{}//#include "UnixBootstrap_data.h"
-}, {
-	NULL, NULL, 0
-}};
-/*
-static void start_bootstrap(struct app_state *app) {
-	jmethodID h = (*app->env)->GetMethodID(
-		app->env, app->app_class, "start", "()V"
-	);
+void AppState::startBootstrap() {
+	jmethodID h = env->GetMethodID(appClass, "start", "()V");
 	if (!h)
 		return;
 
-	(*app->env)->CallObjectMethod(app->env, app->app_obj, h);
+	env->CallObjectMethod(appObj, h);
 }
 
-static int callByteStringSetter(
-	struct app_state *app, jmethodID h, char const *s
-) {
+bool AppState::callByteStringSetter(jmethodID h, char const *s) {
 	size_t sz = strlen(s);	
-	jbyteArray b =(*app->env)->NewByteArray(app->env, sz);
+	jbyteArray b = env->NewByteArray(sz);
 	if (!b)
-		return 0;
+		return false;
 
- 	(*app->env)->SetByteArrayRegion(app->env, b, 0, sz, (jbyte *)s);
-	if ((*app->env)->ExceptionOccurred(app->env))
-		return 0;
+ 	env->SetByteArrayRegion(b, 0, sz, (jbyte *)s);
+	if (env->ExceptionOccurred())
+		return false;
 
-	(*app->env)->CallVoidMethod(app->env, app->app_obj, h, b);
-	(*app->env)->DeleteLocalRef(app->env, b);
-	return 1;
+	env->CallVoidMethod(appObj, h, b);
+	env->DeleteLocalRef(b);
+	return true;
 }
 
-static void configure_bootstrap(struct app_state *app, int argc, char **argv) {
+void AppState::configureBootstrap(int argc, char **argv) {
 	if (!argc) {
-		start_bootstrap(app);
+		startBootstrap();
 		return;
 	}
 
 	int pos = 0;
 
-	jmethodID h = (*app->env)->GetMethodID(
-		app->env, app->app_class, "setProgramName", "([B)V"
-	);
+	jmethodID h = env->GetMethodID(appClass, "setProgramName", "([B)V");
 
 	if (h) {
-		if (!callByteStringSetter(app, h, argv[pos++]))
+		if (!callByteStringSetter(h, argv[pos++]))
 			return;
 	}
 
-	h = (*app->env)->GetMethodID(
-		app->env, app->app_class, "appendArgument", "([B)V"
-	);
+	h = env->GetMethodID(appClass, "appendArgument", "([B)V");
 
 	if (h) {
 		while (pos < argc) {
-			if (!callByteStringSetter(app, h, argv[pos++]))
+			if (!callByteStringSetter(h, argv[pos++]))
 				return;
 		}
 	}
 
-	start_bootstrap(app);
+	startBootstrap();
 }
-*/
-void app_state::load_bootstrap(
-	int argc, char **argv
-) {
-	if (!class_loader)
+
+void AppState::loadBootstrap(int argc, char **argv) {
+	if (!classLoader)
 		return;
-/*
-	for(struct class_data *cd = &bootstrap[0]; cd->name; cd++) {
-		jclass cls = (*app->env)->DefineClass(
-			app->env, cd->name, app->class_loader, cd->data,
-			cd->data_size
-		);
-		if (cd->name == main_bootstrap_class)
-			app->app_class = cls;
+
+	for(auto cd = &BOOTSTRAP[0]; cd->data; cd++) {
+		env->DefineClass(nullptr, classLoader, cd->data, cd->size);
 	}
-*/
-	if (!app_class)
+
+	appClass = env->FindClass(MAIN_BOOTSTRAP_CLASS);
+	if (!appClass)
 		return;
-/*
-	jmethodID ctor = (*app->env)->GetMethodID(
-		app->env, app->app_class, "<init>", "()V"
-	);
+
+	jmethodID ctor = env->GetMethodID(appClass, "<init>", "()V");
 	if (!ctor)
 		return;
 
-	app->app_obj = (*app->env)->NewObject(app->env, app->app_class, ctor);
-	configure_bootstrap(app, argc, argv);
-*/
+	appObj = env->NewObject(appClass, ctor);
+	configureBootstrap(argc, argv);
 }
