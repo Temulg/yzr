@@ -5,11 +5,68 @@
  */
 
 #include "bootstrap.hpp"
-#include <string.h>
+#include <cstring>
+
+namespace yzr {
 
 static char const MAIN_BOOTSTRAP_CLASS[] = "temulg/yzr/podium/Bootstrap";
 
-extern struct ClassData BOOTSTRAP[];
+namespace bootstrap {
+
+void forEachItem(void *userData, void (*cons)(
+	void *userData, jbyte const *data, jsize compSize, jsize size
+));
+
+}
+
+struct Inflater {
+	Inflater(AppState &as_)
+	: as(as_),
+	infClass(as.env->FindClass("java/util/zip/Inflater")),
+	inf(as.env->NewObject(infClass, as.env->GetMethodID(
+		infClass, "<init>", "()V"
+	))),
+	h_setInput(as.env->GetMethodID(infClass, "setInput", "([B)V")),
+	h_inflate(as.env->GetMethodID(infClass, "inflate", "([B)I")),
+	h_reset(as.env->GetMethodID(infClass, "reset", "()V")) {}
+
+	~Inflater() {
+		as.env->CallVoidMethod(
+			inf, as.env->GetMethodID(infClass, "end", "()V")
+		);
+	}
+
+	void loadClass(jbyte const *data, jsize compSize, jsize size) {
+		auto bIn(as.env->NewByteArray(compSize));
+		as.env->SetByteArrayRegion(bIn, 0, compSize, data);
+		as.env->CallVoidMethod(inf, h_setInput, bIn);
+		as.env->DeleteLocalRef(bIn);
+
+		auto bOut(as.env->NewByteArray(size));
+		auto len(as.env->CallIntMethod(inf, h_inflate, bOut));
+		printf("-- inf %p, %d\n", data, len);
+		as.env->ExceptionDescribe();
+
+		auto outBytes(as.env->GetByteArrayElements(bOut, nullptr));
+
+		auto cls(as.env->DefineClass(
+			nullptr, as.classLoader, outBytes, size
+		));
+		printf("-- class %p, size %ld\n", cls, size);
+
+		as.env->ReleaseByteArrayElements(bOut, outBytes, JNI_ABORT);
+		as.env->DeleteLocalRef(bOut);
+
+		as.env->CallVoidMethod(inf, h_reset);
+	}
+
+	AppState &as;
+	jclass infClass;
+	jobject inf;
+	jmethodID h_setInput;
+	jmethodID h_inflate;
+	jmethodID h_reset;
+};
 
 void AppState::startBootstrap() {
 	jmethodID h = env->GetMethodID(appClass, "start", "()V");
@@ -65,8 +122,17 @@ void AppState::loadBootstrap(int argc, char **argv) {
 	if (!classLoader)
 		return;
 
-	for(auto cd = &BOOTSTRAP[0]; cd->data; cd++) {
-		env->DefineClass(nullptr, classLoader, cd->data, cd->size);
+	{
+		Inflater inf(*this);
+
+		bootstrap::forEachItem(&inf, [](
+			void *userData, jbyte const *data, jsize compSize,
+			jsize size
+		) {
+			reinterpret_cast<Inflater *>(userData)->loadClass(
+				data, compSize, size
+			);
+		});
 	}
 
 	appClass = env->FindClass(MAIN_BOOTSTRAP_CLASS);
@@ -79,4 +145,6 @@ void AppState::loadBootstrap(int argc, char **argv) {
 
 	appObj = env->NewObject(appClass, ctor);
 	configureBootstrap(argc, argv);
+}
+
 }

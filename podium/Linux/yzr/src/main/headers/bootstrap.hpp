@@ -1,21 +1,15 @@
 /*
  * Copyright (c) 2018 Alex Dubov <oakad@yahoo.com>
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 3 as publi-
- * shed by the Free Software Foundation.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#if !defined(H_E65780A7B5A829DF6D3C5A0F20B6713D)
-#define H_E65780A7B5A829DF6D3C5A0F20B6713D
+#if !defined(HPP_E65780A7B5A829DF6D3C5A0F20B6713D)
+#define HPP_E65780A7B5A829DF6D3C5A0F20B6713D
 
 #include <jni.h>
 
-struct ClassData {
-	jbyte const *data;
-	jsize size;
-	jsize compSize;
-};
+namespace yzr {
 
 struct AppState {
 	jint createJvm(JavaVM **jvm);
@@ -32,4 +26,5 @@ struct AppState {
 	jobject appObj;
 };
 
+}
 #endif

@@ -10,7 +10,8 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.util.zip.Deflater;
+import java.util.zip.DeflaterInputStream;
 
 import org.gradle.api.DefaultTask;
 import org.gradle.api.GradleException;
@@ -28,7 +29,7 @@ public class BootstrapEncoder extends DefaultTask {
 	}
 
 	@OutputDirectory
-	DirectoryProperty getHeadersDir() {
+	DirectoryProperty getDestDir() {
 		return destinationDirectory;
 	}
 
@@ -44,12 +45,11 @@ public class BootstrapEncoder extends DefaultTask {
 	@TaskAction
 	public void process() throws IOException {
 		var outFile = destinationDirectory.getAsFile().get().toPath().resolve(
-			"bootstrap_data.hpp"
+			"bootstrap_data.cpp"
 		);
 
 		try (var out = Files.newBufferedWriter(outFile)) {
-			out.write('{');
-			out.newLine();
+			appendHeader(out);
 
 			source.getAsFileTree().visit(f -> {
 				if (f.isDirectory())
@@ -63,9 +63,12 @@ public class BootstrapEncoder extends DefaultTask {
 
 			out.write("\tnullptr, 0, 0");
 			out.newLine();
-			out.write('}');
+			out.write("}};");
 			out.newLine();
+
+			appendFooter(out);
 		}
+		deflater.end();
 	}
 
 	private void appendElement(BufferedWriter out, FileTreeElement f) {
@@ -79,18 +82,140 @@ public class BootstrapEncoder extends DefaultTask {
 	private void appendClass(
 		BufferedWriter out, InputStream f, long size
 	) throws IOException {
-		out.write("\t.data = {");
+		var in = new DeflaterInputStream(f, deflater);
+		var data = in.readAllBytes();
+		deflater.reset();
+
+		out.write("\t(jbyte const *)");
 		out.newLine();
-		out.write("\t},");
+		out.write("\t\"");
+
+		int linePos = 0;
+		int cpLen;
+		int cpVal;
+
+		for (byte b: data) {
+			cpVal = ((int)b) & 0xff;
+			if (cpVal >= 0x20 && cpVal < 0x7f) {
+				switch (cpVal) {
+				case 0x22:
+				case 0x5c:
+					cpLen = 2;
+					break;
+				default:
+					cpLen = 1;
+				}
+			} else if (cpVal < 0x20) {
+				cpLen = 2;
+				switch (cpVal) {
+				case 0x07:
+					cpVal = 'a';
+					break;
+				case 0x08:
+					cpVal = 'b';
+					break;
+				case 0x09:
+					cpVal = 't';
+					break;
+				case 0x0a:
+					cpVal = 'n';
+					break;
+				case 0x0b:
+					cpVal = 'v';
+					break;
+				case 0x0c:
+					cpVal = 'f';
+					break;
+				case 0x0d:
+					cpVal = 'r';
+					break;
+				default:
+					cpLen = 4;
+				}
+			} else {
+				cpLen = 4;
+			}
+
+			if ((linePos + cpLen) > BINARY_BLOB_LINE_LEN) {
+				out.write('"');
+				out.newLine();
+				out.write("\t\"");
+				linePos = 0;
+			}
+
+			switch (cpLen) {
+			case 1:
+				out.write(cpVal);
+				linePos++;
+				break;
+			case 2:
+				out.write('\\');
+				out.write(cpVal);
+				linePos += 2;
+				break;
+			case 4:
+				out.write("\\x");
+				out.write(String.format("%02x", cpVal));
+				linePos += 4;
+			}
+		}
+		out.write("\",");
 		out.newLine();
-		out.write(String.format("\t.size = %d,", size));
-		out.newLine();
-		out.write(String.format("\t.compSize = %d", 0));
+		out.write("\t");
+		out.write(Integer.toString(data.length));
+		out.write(", ");
+		out.write(Long.toString(size));
 		out.newLine();
 		out.write("}, {");
 		out.newLine();
 	}
 
+	private void appendHeader(BufferedWriter out) throws IOException {
+		out.write("#include <jni.h>");
+		out.newLine();
+		out.newLine();
+		out.write("namespace yzr { namespace bootstrap {");
+		out.newLine();
+		out.newLine();
+		out.write("constexpr static struct item {");
+		out.newLine();
+		out.write("\tjbyte const *data;");
+		out.newLine();
+		out.write("\tjsize compSize;");
+		out.newLine();
+		out.write("\tjsize size;");
+		out.newLine();
+		out.write("} items[] = {{");
+		out.newLine();
+	}
+
+	private void appendFooter(BufferedWriter out) throws IOException {
+		out.newLine();
+		out.write("void forEachItem(void *userData, void (*cons)(");
+		out.newLine();
+		out.write(
+			"\tvoid *userData, jbyte const *data, "
+			+ "jsize compSize, jsize size"
+		);
+		out.newLine();
+		out.write(")) {");
+		out.newLine();
+		out.write("\tfor (auto const *it(items); it->data; ++it)");
+		out.newLine();
+		out.write(
+			"\t\tcons(userData, it->data, it->compSize, "
+			+ "it->size);"
+		);
+		out.newLine();
+		out.write("}");
+		out.newLine();
+		out.newLine();
+		out.write("}}");
+		out.newLine();
+	}
+
+	static final int BINARY_BLOB_LINE_LEN = 68;
 	private final DirectoryProperty destinationDirectory;
 	private final ConfigurableFileCollection source;
+	private final Deflater deflater = new Deflater(9);
 }

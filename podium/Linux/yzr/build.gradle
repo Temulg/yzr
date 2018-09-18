@@ -11,11 +11,11 @@ task genBootstrap(
 	dependsOn: ':podium:Linux:bootstrap:compileJava'
 ) {
 	source tasks.getByPath(':podium:Linux:bootstrap:compileJava').outputs
-	headersDir = project.layout.buildDirectory.dir("generated/headers")
+	destDir = project.layout.buildDirectory.dir("generated/cpp")
 }
 
 application {
-	privateHeaders.from = ['src/main/headers', genBootstrap.headersDir]
+	source.from = ['src/main/cpp', genBootstrap.destDir]
 }
 
 tasks.withType(CppCompile) {

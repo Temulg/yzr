@@ -7,6 +7,8 @@
 #include "bootstrap.hpp"
 #include <stdio.h>
 
+namespace yzr {
+
 jint AppState::createJvm(JavaVM **jvm) {
 	/*
 	JavaVMOption options[] = {{
@@ -39,9 +41,11 @@ void AppState::obtainClassLoader() {
 	classLoader = env->CallStaticObjectMethod(cls, getter);
 }
 
+}
+
 int main(int argc, char **argv) {
 	JavaVM *jvm;
-	AppState app;
+	yzr::AppState app;
 
 	jint rc = app.createJvm(&jvm);
 	if (rc < 0) {
