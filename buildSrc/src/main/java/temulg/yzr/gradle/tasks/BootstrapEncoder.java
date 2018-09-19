@@ -96,42 +96,19 @@ public class BootstrapEncoder extends DefaultTask {
 
 		for (byte b: data) {
 			cpVal = ((int)b) & 0xff;
+
 			if (cpVal >= 0x20 && cpVal < 0x7f) {
 				switch (cpVal) {
-				case 0x22:
-				case 0x5c:
+				case '"':
+				case '\\':
 					cpLen = 2;
 					break;
 				default:
 					cpLen = 1;
 				}
-			} else if (cpVal < 0x20) {
+			} else if (cpVal >= 0x07 && cpVal < 0x0e) {
+				cpVal = C_ESCAPE_CHARS[cpVal - 7];
 				cpLen = 2;
-				switch (cpVal) {
-				case 0x07:
-					cpVal = 'a';
-					break;
-				case 0x08:
-					cpVal = 'b';
-					break;
-				case 0x09:
-					cpVal = 't';
-					break;
-				case 0x0a:
-					cpVal = 'n';
-					break;
-				case 0x0b:
-					cpVal = 'v';
-					break;
-				case 0x0c:
-					cpVal = 'f';
-					break;
-				case 0x0d:
-					cpVal = 'r';
-					break;
-				default:
-					cpLen = 4;
-				}
 			} else {
 				cpLen = 4;
 			}
@@ -154,8 +131,7 @@ public class BootstrapEncoder extends DefaultTask {
 				linePos += 2;
 				break;
 			case 4:
-				out.write("\\x");
-				out.write(String.format("%02x", cpVal));
+				out.write(String.format("\\%03o", cpVal));
 				linePos += 4;
 			}
 		}
@@ -215,6 +191,10 @@ public class BootstrapEncoder extends DefaultTask {
 	}
 
 	static final int BINARY_BLOB_LINE_LEN = 68;
+	static final char[] C_ESCAPE_CHARS = new char[] {
+		'a', 'b', 't', 'n', 'v', 'f', 'r'
+	};
+
 	private final DirectoryProperty destinationDirectory;
 	private final ConfigurableFileCollection source;
 	private final Deflater deflater = new Deflater(9);

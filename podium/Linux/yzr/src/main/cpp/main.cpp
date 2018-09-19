@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include "bootstrap.hpp"
-#include <stdio.h>
+#include "app_state.hpp"
+#include <cstdio>
 
 namespace yzr {
 
@@ -27,20 +27,6 @@ jint AppState::createJvm(JavaVM **jvm) {
 	);
 }
 
-void AppState::obtainClassLoader() {
-	jclass cls = env->FindClass("java/lang/ClassLoader");
-	if (!cls)
-		return;
-
-	jmethodID getter = env->GetStaticMethodID(
-		cls, "getSystemClassLoader", "()Ljava/lang/ClassLoader;"
-	);
-	if (!getter)
-		return;
-
-	classLoader = env->CallStaticObjectMethod(cls, getter);
-}
-
 }
 
 int main(int argc, char **argv) {
@@ -53,9 +39,7 @@ int main(int argc, char **argv) {
 		return rc;
 	}
 
-	app.obtainClassLoader();
-
-	app.loadBootstrap(argc, argv);
+	app.loadBootstrap(app.env, argc, argv);
 
 	rc = jvm->DestroyJavaVM();
 	if (rc < 0) {

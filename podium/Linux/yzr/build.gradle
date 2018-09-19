@@ -20,6 +20,7 @@ application {
 
 tasks.withType(CppCompile) {
 	compilerArgs = [
+		"-Werror",
 		"-std=c++14",
 		"-I${javaHome}/include",
 		"-I${javaHome}/include/linux"
