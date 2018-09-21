@@ -21,7 +21,7 @@ application {
 tasks.withType(CppCompile) {
 	compilerArgs = [
 		"-Werror",
-		"-std=c++14",
+		"-std=c++17",
 		"-I${javaHome}/include",
 		"-I${javaHome}/include/linux"
 	]
@@ -29,10 +29,7 @@ tasks.withType(CppCompile) {
 
 tasks.withType(LinkExecutable) {
 	linkerArgs = [
-		"-static-libstdc++",
-		"-L${javaHome}/lib/server",
-		"-Wl,-rpath,${javaHome}/lib/server",
-		"-ljvm"
+		"-static-libstdc++", "-lstdc++fs", "-ldl"
 	]
 }
 

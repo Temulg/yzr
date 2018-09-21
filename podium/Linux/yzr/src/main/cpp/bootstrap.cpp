@@ -5,44 +5,34 @@
  */
 
 #include "app_state.hpp"
+#include "jni_adapter.hpp"
+#include <functional>
 
 namespace yzr {
 
 namespace bootstrap {
 
-void forEachItem(void *userData, void (*cons)(
-	void *userData, jbyte const *data, jsize compSize, jsize size
-));
+void forEachItem(std::function<
+	void (jbyte const *data, jsize compSize, jsize size)
+> cons);
 
 }
 
-void AppState::loadBootstrap(JNIEnv *env, int argc, char **argv) {
+void AppState::loadBootstrap() {
 	jni::ClassLoader::JClassType clCls(env);
 	auto cl(jni::ClassLoader::getSystemClassLoader(clCls));
 
 	{
-		typedef std::pair<
-			jni::ClassLoader &, jni::Inflater &
-		> CbClosureType;
-
 		jni::Inflater::JClassType infCls(env);
 		jni::Inflater inf(infCls);
-		CbClosureType pack(cl, inf);
 
-		bootstrap::forEachItem(&pack, [](
-			void *userData, jbyte const *data, jsize compSize,
-			jsize size
+		bootstrap::forEachItem([&cl, &inf] (
+			jbyte const *data, jsize compSize, jsize size
 		) {
-			auto pack(reinterpret_cast<CbClosureType *>(
-				userData
-			));
-			auto &cl(pack->first);
-			auto &inf(pack->second);
 			auto env(inf.cls.env);
 
-			jni::ByteArray bIn(
-				data, compSize, env
-			), bOut(size, env);
+			jni::ByteArray bIn(data, compSize, env);
+			jni::ByteArray bOut(size, env);
 
 			inf.setInput(bIn);
 			inf.inflate(bOut);
@@ -60,7 +50,7 @@ void AppState::loadBootstrap(JNIEnv *env, int argc, char **argv) {
 
 	jni::YzrBootstrap::JClassType ybCls(env);
 	jni::YzrBootstrap yb(ybCls);
-
+/*
 	if (!argc) {
 		yb.start();
 		return;
@@ -76,7 +66,7 @@ void AppState::loadBootstrap(JNIEnv *env, int argc, char **argv) {
 		jni::ByteArray b(argv[pos++], env);
 		yb.appendArgument(b);
 	}
-
+*/
 	yb.start();
 }
 

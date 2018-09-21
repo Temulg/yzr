@@ -149,6 +149,9 @@ public class BootstrapEncoder extends DefaultTask {
 	private void appendHeader(BufferedWriter out) throws IOException {
 		out.write("#include <jni.h>");
 		out.newLine();
+		out.write("#include <functional>");
+		out.newLine();
+		out.newLine();
 		out.newLine();
 		out.write("namespace yzr { namespace bootstrap {");
 		out.newLine();
@@ -167,20 +170,19 @@ public class BootstrapEncoder extends DefaultTask {
 
 	private void appendFooter(BufferedWriter out) throws IOException {
 		out.newLine();
-		out.write("void forEachItem(void *userData, void (*cons)(");
+		out.write("void forEachItem(std::function<");
 		out.newLine();
 		out.write(
-			"\tvoid *userData, jbyte const *data, "
-			+ "jsize compSize, jsize size"
+			"\tvoid (jbyte const *data, "
+			+ "jsize compSize, jsize size)"
 		);
 		out.newLine();
-		out.write(")) {");
+		out.write("> cons) {");
 		out.newLine();
 		out.write("\tfor (auto const *it(items); it->data; ++it)");
 		out.newLine();
 		out.write(
-			"\t\tcons(userData, it->data, it->compSize, "
-			+ "it->size);"
+			"\t\tcons(it->data, it->compSize, it->size);"
 		);
 		out.newLine();
 		out.write("}");
