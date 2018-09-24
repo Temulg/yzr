@@ -18,7 +18,7 @@ void forEachItem(std::function<
 
 }
 
-void AppState::loadBootstrap() {
+void AppState::loadBootstrap(AppEnv const &appEnv) {
 	jni::ClassLoader::JClassType clCls(env);
 	auto cl(jni::ClassLoader::getSystemClassLoader(clCls));
 

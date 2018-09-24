@@ -29,7 +29,7 @@ tasks.withType(CppCompile) {
 
 tasks.withType(LinkExecutable) {
 	linkerArgs = [
-		"-static-libstdc++", "-lstdc++fs", "-ldl"
+		"-static-libstdc++", "-ldl"
 	]
 }
 

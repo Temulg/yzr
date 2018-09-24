@@ -26,9 +26,9 @@ struct ClassLoader {
 
 	static constexpr std::array<MethodInfo, 0> methods = {};
 
-	static constexpr std::array<MethodInfo, 1> staticMethods = {{
+	static constexpr std::array<MethodInfo, 1> staticMethods = {
 		{"getSystemClassLoader", "()Ljava/lang/ClassLoader;"}
-	}};
+	};
 };
 
 template <typename _D = void>

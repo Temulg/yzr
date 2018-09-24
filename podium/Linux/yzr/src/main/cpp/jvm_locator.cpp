@@ -6,7 +6,6 @@
 
 #include "app_state.hpp"
 #include <array>
-#include <experimental/filesystem>
 #include <dlfcn.h>
 
 namespace yzr {
@@ -20,11 +19,15 @@ void JVMCloser::operator()(JavaVM *jvm) const {
 	jvm->DestroyJavaVM();
 }
 
+}
+
+namespace {
+
 struct JvmLocator {
 	virtual ~JvmLocator() {}
 
 	virtual bool hasNext() = 0;
-	virtual DlHandle &&next() = 0;
+	virtual detail::DlHandle &&next() = 0;
 };
 
 typedef std::unique_ptr<JvmLocator> JvmLocatorPtr;
@@ -37,25 +40,26 @@ struct JvmLocatorEnv : JvmLocator {
 
 	bool hasNext() override;
 
-	DlHandle &&next() override {
+	detail::DlHandle &&next() override {
 		return std::move(handle);
 	}
 
 private:
 	bool done;
-	DlHandle handle;
+	detail::DlHandle handle;
 };
 
-static constexpr std::array<JvmLocatorFactory, 1> jvmLocators = {{
+static constexpr std::array jvmLocators = {
 	&JvmLocatorEnv::make
-}};
+};
 
 static constexpr jint desiredJvmVersion = JNI_VERSION_10;
 
-static constexpr std::array<char const *, 3> jvmVariants = {{
-	"lib/server/libjvm.so", "lib/client/libjvm.so",
+static constexpr std::array jvmVariants = {
+	"lib/server/libjvm.so",
+	"lib/client/libjvm.so",
 	"lib/minimal/libjvm.so"
-}};
+};
 
 }
 
@@ -66,13 +70,13 @@ void AppState::locateJvm() {
 	}};
 	*/
 	JavaVMInitArgs vmArgs {
-		.version = detail::desiredJvmVersion,
+		.version = desiredJvmVersion,
 		.nOptions = 0,
 		.options = nullptr,
 		.ignoreUnrecognized = JNI_FALSE
 	};
 
-	for (auto lf: detail::jvmLocators) {
+	for (auto lf: jvmLocators) {
 		auto loc(lf());
 		while (loc->hasNext()) {
 			auto handle(loc->next());
@@ -116,16 +120,12 @@ void AppState::locateJvm() {
 	}
 }
 
-namespace detail {
+namespace {
 
-static DlHandle &&openLibJvm(
-	std::experimental::filesystem::path const &jvmPath_
-) {
-	namespace fs = std::experimental::filesystem;
-
-	DlHandle rv;
+static detail::DlHandle openLibJvm(std::string const &jvmPath_) {
+	detail::DlHandle rv;
 	std::error_code ec;
-
+/*
 	auto jvmPath(fs::system_complete(jvmPath_, ec));
 	if (ec)
 		return std::move(rv);
@@ -142,13 +142,11 @@ static DlHandle &&openLibJvm(
 				break;
 		}
 	}
-
-	return std::move(rv);
+*/
+	return rv;
 }
 
 bool JvmLocatorEnv::hasNext() {
-	namespace fs = std::experimental::filesystem;
-
 	if (done)
 		return false;
 
@@ -158,7 +156,7 @@ bool JvmLocatorEnv::hasNext() {
 	if (!jhVar)
 		return false;
 
-	handle = openLibJvm(fs::path(jhVar));
+	handle = openLibJvm(jhVar);
 	return handle ? true : false;
 }
 
