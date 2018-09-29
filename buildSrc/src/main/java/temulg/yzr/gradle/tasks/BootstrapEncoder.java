@@ -160,7 +160,7 @@ public class BootstrapEncoder extends DefaultTask {
 		out.newLine();
 		out.write("\tjbyte const *data;");
 		out.newLine();
-		out.write("\tjsize compSize;");
+		out.write("\tjsize comp_size;");
 		out.newLine();
 		out.write("\tjsize size;");
 		out.newLine();
@@ -170,11 +170,11 @@ public class BootstrapEncoder extends DefaultTask {
 
 	private void appendFooter(BufferedWriter out) throws IOException {
 		out.newLine();
-		out.write("void forEachItem(std::function<");
+		out.write("void for_each_item(std::function<");
 		out.newLine();
 		out.write(
 			"\tvoid (jbyte const *data, "
-			+ "jsize compSize, jsize size)"
+			+ "jsize comp_size, jsize size)"
 		);
 		out.newLine();
 		out.write("> cons) {");
@@ -182,7 +182,7 @@ public class BootstrapEncoder extends DefaultTask {
 		out.write("\tfor (auto const *it(items); it->data; ++it)");
 		out.newLine();
 		out.write(
-			"\t\tcons(it->data, it->compSize, it->size);"
+			"\t\tcons(it->data, it->comp_size, it->size);"
 		);
 		out.newLine();
 		out.write("}");

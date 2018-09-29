@@ -7,68 +7,55 @@
 #if !defined(HPP_E65780A7B5A829DF6D3C5A0F20B6713D)
 #define HPP_E65780A7B5A829DF6D3C5A0F20B6713D
 
+#include <vector>
 #include <memory>
-#include <experimental/filesystem>
-
+#include "properties.hpp"
 #include <jni.h>
 
 namespace yzr {
 namespace detail {
 
-struct DlCloser {
+struct dl_closer {
 	void operator()(void *handle) const;
 };
 
-typedef std::unique_ptr<void, DlCloser> DlHandle;
+typedef std::unique_ptr<void, dl_closer> dl_handle;
 
-struct JVMCloser {
+struct jvm_closer {
 	void operator()(JavaVM *jvm) const;
 };
 
-typedef std::unique_ptr<JavaVM, JVMCloser> JvmPtr;
+typedef std::unique_ptr<JavaVM, jvm_closer> jvm_ptr;
 
 }
 
-struct Error : std::exception {
-	Error(char const *format, ...);
+struct app_env {
+	app_env &inspect_cmd_args(int argc, char **argv);
+	app_env &setup();
 
-	~Error() {
-		free(msg);
-	}
+	std::string yzr_dir;
+	std::string work_dir;
+	std::string build_dir;
 
-	char const *what() const noexcept override {
-		return msg;
-	}
-protected:
-	Error() {
-	}
+	std::string user_name;
+	std::string user_home_dir;
+	std::string user_data_dir;
+	std::string user_config_dir;
+	std::string user_runtime_dir;
 
-	char *msg;
+	std::vector<std::pair<std::string, properties>> java_prop_set;
 };
 
-struct UsageError : Error {
-	UsageError(char const *format, ...);
-};
+struct app_state {
+	app_state(app_state const &) = delete;
+	app_state& operator=(app_state const &) = delete;
 
-struct AppEnv {
-	bool inspectCmdArgs(int argc, char **argv);
-	void setup();
+	void locate_jvm(app_env const &ae);
+	void load_bootstrap(app_env &ae);
+	int prepare_and_start(int argc, char **argv);
 
-	std::string yzrDir;
-	std::string workDir;
-	std::string buildDir;
-	std::vector<std::string> configDirs;
-};
-
-struct AppState {
-	AppState(AppState const &) = delete;
-	AppState& operator=(AppState const &) = delete;
-
-	void locateJvm();
-	void loadBootstrap(AppEnv const &appEnv);
-
-	detail::DlHandle libJvmHandle;
-	detail::JvmPtr jvm;
+	detail::dl_handle libjvm_handle;
+	detail::jvm_ptr jvm;
 	JNIEnv *env;
 };
 

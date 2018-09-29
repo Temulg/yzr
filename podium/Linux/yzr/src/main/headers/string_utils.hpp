@@ -12,7 +12,7 @@
 namespace yzr::detail {
 
 template <typename StringType, typename Consumer>
-void forEachSubstring(
+void for_each_substring(
 	StringType const &s, typename StringType::value_type sep,
 	Consumer &&cons
 ) {

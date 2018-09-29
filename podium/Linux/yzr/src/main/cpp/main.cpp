@@ -4,46 +4,50 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+#include "error.hpp"
 #include "app_state.hpp"
 #include <cstring>
 
 namespace {
 
-enum struct ArgType : int {
+enum struct arg_type : int {
 	INVALID,
 	LONG,
 	SHORT,
 	ANY
 };
 
-ArgType argType(char const *arg) {
+arg_type arg_to_type(char const *arg) {
 	if (arg[0] != '-')
-		return arg[0] ? ArgType::ANY : ArgType::INVALID;
+		return arg[0] ? arg_type::ANY : arg_type::INVALID;
 
 	if (arg[1] != '-')
-		return arg[1] ? ArgType::SHORT : ArgType::ANY;
+		return arg[1] ? arg_type::SHORT : arg_type::ANY;
 
-	return arg[2] ? ArgType::LONG : ArgType::ANY;
+	return arg[2] ? arg_type::LONG : arg_type::ANY;
 }
 
-bool matchArg(
-	char const *arg, ArgType at, char const *shopt, char const *lopt
+bool match_arg(
+	char const *arg, arg_type at, char const *shopt, char const *lopt
 ) {
 	switch (at) {
-	case ArgType::LONG:
+	case arg_type::LONG:
 		return strcmp(arg, lopt) ? false : true;
-	case ArgType::SHORT:
+	case arg_type::SHORT:
 		return strcmp(arg, shopt) ? false : true;
 	default:
 		return false;
 	}
 }
 
+constexpr char usage_string[] =
+	"Usage: yzr [-b | --build-dir <path>] <command> [<args>]\n";
+
 }
 
 namespace yzr {
 
-Error::Error(char const *format, ...) {
+error::error(char const *format, ...) {
 	va_list args;
 	va_start(args, format);
 	if (0 >= vasprintf(&msg, format, args))
@@ -51,7 +55,7 @@ Error::Error(char const *format, ...) {
 	va_end(args);
 }
 
-UsageError::UsageError(char const *format, ...) {
+usage_error::usage_error(char const *format, ...) {
 	va_list args;
 	va_start(args, format);
 	if (0 >= vasprintf(&msg, format, args))
@@ -59,65 +63,61 @@ UsageError::UsageError(char const *format, ...) {
 	va_end(args);
 }
 
-static constexpr char usageString[] =
-	"Usage: yzr [-b | --build-dir <path>] <command> [<args>]\n";
-
-bool AppEnv::inspectCmdArgs(int argc, char **argv) {
+app_env &app_env::inspect_cmd_args(int argc, char **argv) {
 	int pos(1);
 
 	while (pos < argc) {
 		auto a(argv[pos]);
-		auto at(argType(a));
+		auto at(arg_to_type(a));
 		char const *b;
 
 		switch (at) {
-		case ArgType::INVALID:
-			return false;
-		case ArgType::LONG:
+		case arg_type::INVALID:
+			throw usage_error("invalid argument %s", a);
+		case arg_type::LONG:
 			b = a + 2;
 			break;
-		case ArgType::SHORT:
+		case arg_type::SHORT:
 			b = a + 1;
 			break;
-		case ArgType::ANY:
-			return true;
+		case arg_type::ANY:
+			return *this;
 		}
 
-		if (matchArg(b, at, "b", "build-dir")) {
+		if (match_arg(b, at, "b", "build-dir")) {
 			if (argc == ++pos)
-				throw UsageError(
+				throw usage_error(
 					"no directory given for %s", a
 				);
 
-			buildDir = argv[pos++];
+			build_dir = argv[pos++];
 			continue;
 		}
 
 		pos++;
 	}
 
-	return true;
+	return *this;
 }
-
 
 }
 
 int main(int argc, char **argv) {
-	yzr::AppState app{};
+	yzr::app_state app{};
 
 	try {
-		yzr::AppEnv env;
+		yzr::app_env ae;
 
-		if (!env.inspectCmdArgs(argc, argv)) {
-			
-			return -1;
-		}
+		ae.inspect_cmd_args(
+			argc, argv
+		).setup();
 
-		env.setup();
-	} catch (yzr::UsageError const &e) {
+		app.locate_jvm(ae);
+		app.load_bootstrap(ae);
+	} catch (yzr::usage_error const &e) {
 		fputs(e.what(), stderr);
 		fputc('\n', stderr);
-		fputs(yzr::usageString, stderr);
+		fputs(usage_string, stderr);
 		return -1;
 	} catch (std::exception const &e) {
 		fputs(e.what(), stderr);
@@ -125,5 +125,5 @@ int main(int argc, char **argv) {
 		return -2;
 	}
 
-	return 0;
+	return app.prepare_and_start(argc, argv);
 }
