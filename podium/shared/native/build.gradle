@@ -1,0 +1,13 @@
+import temulg.yzr.gradle.tasks.BuildInfoSetter;
+
+plugins {
+	id 'cpp-library'
+}
+
+task setBuildInfo(type: BuildInfoSetter) {
+	destDir = project.layout.buildDirectory.dir("generated/headers")
+}
+
+library {
+	publicHeaders.from = ['src/main/headers', setBuildInfo.destDir]
+}

@@ -2,6 +2,7 @@ rootProject.name = 'yzr'
 
 def yzrTargetOS = System.properties['os.name']
 
+include "podium:shared:native"
 include "podium:${yzrTargetOS}"
 include "podium:${yzrTargetOS}:yzr"
 include "podium:${yzrTargetOS}:bootstrap"
