@@ -7,12 +7,10 @@
 package temulg.yzr.gradle.tasks;
 
 import java.io.BufferedWriter;
-import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 
@@ -25,7 +23,6 @@ import org.gradle.api.tasks.TaskAction;
 
 public class BuildInfoSetter extends DefaultTask {
 	public BuildInfoSetter() throws IOException {
-		destinationDirectory = newOutputDirectory();
 		getOutputs().upToDateWhen(BuildInfoSetter::upToDate);
 		gitData = GitData.fromGit(
 			getProject().getRootDir().toPath()
@@ -191,6 +188,7 @@ public class BuildInfoSetter extends DefaultTask {
 		"build_ref_id = \"(.+)\""
 	);
 
-	private final DirectoryProperty destinationDirectory;
+	private final DirectoryProperty destinationDirectory
+	= getProject().getObjects().directoryProperty();
 	private final GitData gitData;
 }

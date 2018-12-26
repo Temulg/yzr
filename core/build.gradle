@@ -1,0 +1,34 @@
+plugins {
+	id 'java'
+	id 'eclipse'
+}
+
+repositories {
+	mavenLocal()
+	mavenCentral()
+}
+
+dependencies {
+	compile 'org.jgrapht:jgrapht-core:1.3.0'
+}
+
+eclipse {
+	classpath {
+		downloadSources = true
+		downloadJavadoc = true
+	}
+}
+
+version = 1.0
+
+sourceSets {
+	ostraca {
+		compileClasspath += sourceSets.main.compileClasspath + main.output
+		runtimeClasspath += sourceSets.main.runtimeClasspath + main.output
+	}
+}
+
+task(Tac0, dependsOn: ['classes', 'ostracaClasses'], type: JavaExec) {
+	main = 'Tac0'
+	classpath = sourceSets.ostraca.output + sourceSets.ostraca.runtimeClasspath
+}

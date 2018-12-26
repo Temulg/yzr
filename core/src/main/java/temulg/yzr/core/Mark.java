@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-package temulg.yzr.core.marks;
+package temulg.yzr.core;
 
 /**
  * Mark is a baisc measure of result in the Yzr system. Given a number of

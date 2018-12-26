@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-package temulg.yzr.core.marks;
+package temulg.yzr.core;
 
 import java.util.Arrays;
 

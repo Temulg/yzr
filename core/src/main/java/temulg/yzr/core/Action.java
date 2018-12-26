@@ -6,8 +6,6 @@
 
 package temulg.yzr.core;
 
-import temulg.yzr.core.marks.Mark;
-
 /**
  * Action, when supplied with some @{link Mark marks} and invoked will modify
  * the global environment in such a way as to satisfy the @{link Mark marks}

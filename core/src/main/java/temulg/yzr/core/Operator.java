@@ -6,12 +6,10 @@
 
 package temulg.yzr.core;
 
-import temulg.yzr.core.marks.Mark;
-
 /**
- * Actor, given a collection of existing {@link Mark marks} will decide,
+ * Operator, given a collection of existing {@link Mark marks} will decide,
  * whether some marks are to be made, remade or discarded. It will add some
  * {@link Action actions} to the Yzr execution graph if any work is to be done.
  */
-public interface Actor {
+public interface Operator {
 }

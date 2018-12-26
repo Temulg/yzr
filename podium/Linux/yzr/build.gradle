@@ -10,7 +10,7 @@ task genBootstrap(
 	type: BootstrapEncoder,
 	dependsOn: ':podium:Linux:bootstrap:compileJava'
 ) {
-	source tasks.getByPath(':podium:Linux:bootstrap:compileJava').outputs
+	source.from tasks.getByPath(':podium:Linux:bootstrap:compileJava').outputs
 	destDir = project.layout.buildDirectory.dir("generated/cpp")
 }
 

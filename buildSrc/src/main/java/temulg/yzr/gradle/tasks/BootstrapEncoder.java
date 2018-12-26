@@ -23,11 +23,6 @@ import org.gradle.api.tasks.OutputDirectory;
 import org.gradle.api.tasks.TaskAction;
 
 public class BootstrapEncoder extends DefaultTask {
-	public BootstrapEncoder() {
-		source = getProject().files();
-		destinationDirectory = newOutputDirectory();
-	}
-
 	@OutputDirectory
 	DirectoryProperty getDestDir() {
 		return destinationDirectory;
@@ -36,10 +31,6 @@ public class BootstrapEncoder extends DefaultTask {
 	@InputFiles
 	public ConfigurableFileCollection getSource() {
 		return source;
-	}
-
-	public void source(Object source_) {
-		source.from(source_);
 	}
 
 	@TaskAction
@@ -197,7 +188,7 @@ public class BootstrapEncoder extends DefaultTask {
 		'a', 'b', 't', 'n', 'v', 'f', 'r'
 	};
 
-	private final DirectoryProperty destinationDirectory;
-	private final ConfigurableFileCollection source;
+	private final DirectoryProperty destinationDirectory = getProject().getObjects().directoryProperty();
+	private final ConfigurableFileCollection source = getProject().files();
 	private final Deflater deflater = new Deflater(9);
 }
