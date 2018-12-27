@@ -12,4 +12,7 @@ package temulg.yzr.core;
  * {@link Action actions} to the Yzr execution graph if any work is to be done.
  */
 public interface Operator {
+	MarkPack newRequisites();
+
+	MarkPack newProducts();
 }

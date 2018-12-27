@@ -4,15 +4,17 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-package temulg.yzr.core;
+package temulg.yzr.core.marks;
 
 import java.util.Arrays;
 
+import temulg.yzr.core.Mark;
+
 /**
- * MarkArray is a simple immutable collection of Marks of the same type.
+ * Array is a simple immutable collection of Marks of the same type.
  */
-public class MarkArray implements Mark {
-	private MarkArray(Mark[] nested_) {
+public class Array implements Mark {
+	private Array(Mark[] nested_) {
 		nested = Arrays.copyOf(nested_, nested_.length);
 	}
 
