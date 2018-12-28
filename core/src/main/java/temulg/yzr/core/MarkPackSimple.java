@@ -6,7 +6,9 @@
 
 package temulg.yzr.core;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Map;
 
 public class MarkPackSimple implements MarkPack {
 	public static class Ref implements MarkPack.Ref {
@@ -91,7 +93,13 @@ public class MarkPackSimple implements MarkPack {
 
 	private MarkPackSimple(Builder b) {
 		marks = new Mark[b.posCount];
-		named = new HashMap<>(b.posCount);
+		named = b.named != null
+			? new HashMap<>(b.posCount)
+			: Collections.emptyMap();
+
+		if (b.named == null)
+			return;
+
 		for (int pos = 0; pos < b.posCount; pos++) {
 			if (b.named[pos] != null)
 				named.put(b.named[pos], pos);
@@ -99,5 +107,5 @@ public class MarkPackSimple implements MarkPack {
 	}
 
 	private final Mark[] marks;
-	private final HashMap<String, Integer> named;
+	private final Map<String, Integer> named;
 }

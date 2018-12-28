@@ -6,11 +6,12 @@
 
 package temulg.yzr.core.lib.fs.ops;
 
+import temulg.yzr.core.Entity;
 import temulg.yzr.core.MarkPack;
 import temulg.yzr.core.MarkPackSimple;
 import temulg.yzr.core.Operator;
 
-public class FileCreated implements Operator {
+public class FileCreated extends Entity implements Operator {
 	@Override
 	public MarkPack newRequisites() {
 		return MarkPackSimple.builder().positionalCount(1).build();

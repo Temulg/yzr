@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import java.util.concurrent.ForkJoinPool;
+
 import temulg.yzr.core.OpGraph;
 import temulg.yzr.core.Operator;
 import temulg.yzr.core.PackSelector;
@@ -28,7 +30,9 @@ public class Tac0 {
 		var n1 = Node.of("t1.txt");
 		var n2 = Node.of("t2.txt");
 
-		var op0 = new Exec();
+		var op0 = Exec.builder().addRequisite(
+			"command"
+		).addRequisite().addProduct().build();
 
 		opg.Add(
 			new FileExists(), PackSelector.positional(0),
@@ -46,6 +50,8 @@ public class Tac0 {
 			n2
 		);
 
-		var acg = opg.toActionGraph();
+		System.out.println("Verify " + opg.verify());
+
+		var at = opg.makeActionTracker(ForkJoinPool.commonPool());
 	}
 }

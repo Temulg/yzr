@@ -7,10 +7,11 @@
 package temulg.yzr.core.lib.fs.ops;
 
 import temulg.yzr.core.Operator;
+import temulg.yzr.core.Entity;
 import temulg.yzr.core.MarkPack;
 import temulg.yzr.core.MarkPackSimple;
 
-public class FileExists implements Operator {
+public class FileExists extends Entity implements Operator {
 	@Override
 	public MarkPack newRequisites() {
 		return MarkPack.EMPTY;
