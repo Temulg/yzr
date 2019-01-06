@@ -8,6 +8,7 @@ package temulg.yzr.core.marks;
 
 import java.util.Arrays;
 
+import temulg.yzr.core.Context;
 import temulg.yzr.core.Mark;
 
 /**
@@ -16,6 +17,11 @@ import temulg.yzr.core.Mark;
 public class Array implements Mark {
 	private Array(Mark[] nested_) {
 		nested = Arrays.copyOf(nested_, nested_.length);
+	}
+
+	@Override
+	public Info getInfo(Context context) {
+		return null;
 	}
 
 	private final Mark[] nested;

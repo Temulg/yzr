@@ -5,6 +5,7 @@
  */
 
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
 
 import temulg.yzr.core.OpGraph;
 import temulg.yzr.core.Operator;
@@ -50,8 +51,13 @@ public class Tac0 {
 			n2
 		);
 
-		System.out.println("Verify " + opg.verify());
+		System.out.println("-- Verify " + opg.verify());
 
-		var at = opg.makeActionTracker(ForkJoinPool.commonPool());
+		var ctx = new Context();
+		var at = opg.makeActionTracker(ctx);
+		at.process();
+		ctx.awaitTermination();
+		System.out.println("-- Done");
+		
 	}
 }

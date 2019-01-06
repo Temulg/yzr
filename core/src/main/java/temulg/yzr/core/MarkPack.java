@@ -9,9 +9,9 @@ package temulg.yzr.core;
 public interface MarkPack {
 	public interface Ref {}
 
-	Mark get(String name);
-	Mark get(Ref ref);
-	Mark get(int pos);
+	<M extends Mark> M get(String name);
+	<M extends Mark> M get(Ref ref);
+	<M extends Mark> M get(int pos);
 
 	Ref put(String name, Mark m);
 	Ref put(int pos, Mark m);
@@ -20,17 +20,17 @@ public interface MarkPack {
 
 	public static MarkPack EMPTY = new MarkPack() {
 		@Override
-		public Mark get(String name) {
+		public <M extends Mark> M get(String name) {
 			throw new IndexOutOfBoundsException();
 		}
 
 		@Override
-		public Mark get(Ref ref) {
+		public <M extends Mark> M get(Ref ref) {
 			throw new IndexOutOfBoundsException();
 		}
 
 		@Override
-		public Mark get(int pos) {
+		public <M extends Mark> M get(int pos) {
 			throw new IndexOutOfBoundsException();
 		}
 

@@ -25,6 +25,17 @@ public class Exec extends Entity implements Operator {
 		return preparePack(prods);
 	}
 
+	@Override
+	public void apply(
+		Operator.Action act, MarkPack requisites, MarkPack products
+	) {
+		try {
+			
+		} catch (Exception ex) {
+			act.failed(ex);
+		}
+	}
+
 	private static MarkPack preparePack(ArrayList<Selector> ss) {
 		var b = MarkPackSimple.builder().positionalCount(ss.size());
 

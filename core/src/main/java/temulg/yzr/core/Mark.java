@@ -6,6 +6,8 @@
 
 package temulg.yzr.core;
 
+import java.time.Instant;
+
 /**
  * Mark is a baisc measure of result in the Yzr system. Given a number of
  * existing marks, the usual questions Yzr has to answer are as following:
@@ -16,4 +18,15 @@ package temulg.yzr.core;
  * </ul>
  */
 public interface Mark {
+	public interface Info {
+		boolean present();
+
+		Instant lastModified();
+	}
+
+	Info getInfo(Context context);
+
+	default Entity entity() {
+		return (Entity)this;
+	}
 }

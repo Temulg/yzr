@@ -6,14 +6,12 @@
 
 package temulg.yzr.core;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.UUID;
-import java.util.concurrent.Executor;
 
 import org.jgrapht.alg.cycle.CycleDetector;
-import org.jgrapht.graph.SimpleDirectedGraph;
-import org.jgrapht.traverse.TopologicalOrderIterator;
+import org.jgrapht.graph.DefaultEdge;
+import org.jgrapht.graph.DirectedMultigraph;
 
 public class OpGraph extends Entity {
 	public boolean verify() {
@@ -33,8 +31,8 @@ public class OpGraph extends Entity {
 		return false;
 	}
 
-	public ActionTracker makeActionTracker(Executor exec) {
-		var at = new ActionTracker(vertexMap.size(), exec);
+	public ActionTracker makeActionTracker(Context context) {
+		var at = new ActionTracker(context, vertexMap.size());
 		HashMap<UUID, ActionTracker.Item> imap = new HashMap<>();
 
 		vertexMap.forEach((k, v) -> {
@@ -46,10 +44,9 @@ public class OpGraph extends Entity {
 				at.roots.add(it);
 		});
 
-		edgeMap.forEach((k, e) -> {
-			var src = ((Entity)g.getEdgeSource(e).op).getEID();
-			var dst = ((Entity)g.getEdgeTarget(e).op).getEID();
-
+		g.edgeSet().forEach(edge -> {
+			var src = g.getEdgeSource(edge).op.entity().getEID();
+			var dst = g.getEdgeTarget(edge).op.entity().getEID();
 			imap.get(src).next.add(imap.get(dst));
 		});
 
@@ -64,36 +61,22 @@ public class OpGraph extends Entity {
 		var src = getVertex(src_);
 		var dst = getVertex(dst_);
 
-		var edge = getEdge(
+		g.addEdge(src, dst, new Edge(
 			m,
 			prodSel.put(src.products, m),
 			reqSel.put(dst.requisites, m)
-		);
-
-		g.addEdge(src, dst, edge);
+		));
 	}
 
 	private Vertex getVertex(Operator op) {
-		var entity = (Entity)op;
-
-		return vertexMap.computeIfAbsent(entity.getEID(), k -> {
+		return vertexMap.computeIfAbsent(op.entity().getEID(), k -> {
 			var v = new Vertex(op);
 			g.addVertex(v);
 			return v;
 		});
 	}
 
-	private Edge getEdge(
-		Mark mark, MarkPack.Ref prod, MarkPack.Ref req
-	) {
-		var entity = (Entity)mark;
-
-		return edgeMap.computeIfAbsent(entity.getEID(), k -> {
-			return new Edge(mark, prod, req);
-		});
-	}
-
-	class Vertex {
+	static class Vertex {
 		private Vertex(Operator op_) {
 			op = op_;
 			products = op.newProducts();
@@ -115,7 +98,7 @@ public class OpGraph extends Entity {
 		final MarkPack requisites;
 	}
 
-	class Edge {
+	static class Edge extends DefaultEdge {
 		private Edge(
 			Mark mark_, MarkPack.Ref prod_, MarkPack.Ref req_
 		) {
@@ -124,24 +107,15 @@ public class OpGraph extends Entity {
 			req = req_;
 		}
 
-		@Override
-		public boolean equals(Object other) {
-			return mark.equals(((Edge)other).mark);
-		}
-	
-		@Override
-		public int hashCode() {
-			return mark.hashCode();
-		}
+		private static final long serialVersionUID = 0x23426dfdf837eaaaL;
 
-		final Mark mark;
-		final MarkPack.Ref prod;
-		final MarkPack.Ref req;
+		final transient Mark mark;
+		final transient MarkPack.Ref prod;
+		final transient MarkPack.Ref req;
 	}
 
 	private final HashMap<UUID, Vertex> vertexMap = new HashMap<>();
-	private final HashMap<UUID, Edge> edgeMap = new HashMap<>();
-	private final SimpleDirectedGraph<
+	private final DirectedMultigraph<
 		Vertex, Edge
-	> g = new SimpleDirectedGraph<>(null, null, false);
+	> g = new DirectedMultigraph<>(null, null, false);
 }
