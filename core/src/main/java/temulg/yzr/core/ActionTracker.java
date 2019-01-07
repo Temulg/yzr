@@ -26,6 +26,17 @@ public class ActionTracker {
 		aborted = true;
 	}
 
+	private static class ItemLink {
+		ItemLink(Item it_, ProdPack.Getter prod_, ReqPack.Setter req_) {
+			it = it_;
+			prod = prod_;
+			req = req_;
+		}
+		final Item it;
+		final ProdPack.Getter prod;
+		final ReqPack.Setter req;
+	}
+
 	class Item implements Operator.Action, Runnable {
 		Item(
 			OpGraph.Vertex v_, int prevCount_, int nextCount
@@ -33,6 +44,8 @@ public class ActionTracker {
 			v = v_;
 			prevCount = prevCount_;
 			next = new ArrayList<>(nextCount);
+			requisites = v.requisites.allocate();
+			products = v.products.allocate();
 		}
 
 		@Override
@@ -44,9 +57,7 @@ public class ActionTracker {
 			prodsUpdated = reqsUpdated.get();
 
 			try {
-				v.op.apply(
-					this, v.requisites, v.products
-				);
+				v.op.apply(this, requisites, products);
 
 				scheduleNext();
 			} catch (Exception ex) {
@@ -66,9 +77,12 @@ public class ActionTracker {
 		}
 
 		private void scheduleNext() {
-			next.forEach(it -> {
-				if (it.markReady(prodsUpdated) && !aborted)
-					context.execute(it);
+			next.forEach(next -> {
+				var m = next.prod.get(products);
+				next.req.set(next.it.requisites, m);
+
+				if (next.it.markReady(prodsUpdated) && !aborted)
+					context.execute(next.it);
 			});
 			next.clear();
 		}
@@ -99,13 +113,23 @@ public class ActionTracker {
 			prodsUpdated = inst;
 		}
 
+		void linkNext(
+			Item it, ProdPack.Getter prod, ReqPack.Setter req
+		) {
+			next.add(new ItemLink(it, prod, req));
+		}
+
 		private final OpGraph.Vertex v;
 		private final AtomicInteger prevCompleted = new AtomicInteger();
 		private final AtomicReference<
 			Instant
 		> reqsUpdated = new AtomicReference<>(Instant.MIN);
 		private final int prevCount;
-		final ArrayList<Item> next;
+
+		private final ReqPack.Storage requisites;
+		private final ProdPack.Storage products;
+
+		final ArrayList<ItemLink> next;
 		private volatile boolean skipped;
 		private volatile Instant prodsUpdated;
 	}

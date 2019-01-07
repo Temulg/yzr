@@ -7,6 +7,7 @@
 package temulg.yzr.core;
 
 import java.time.Instant;
+import java.util.Optional;
 
 /**
  * Mark is a baisc measure of result in the Yzr system. Given a number of
@@ -18,13 +19,7 @@ import java.time.Instant;
  * </ul>
  */
 public interface Mark {
-	public interface Info {
-		boolean present();
-
-		Instant lastModified();
-	}
-
-	Info getInfo(Context context);
+	Optional<Instant> lastModified();
 
 	default Entity entity() {
 		return (Entity)this;

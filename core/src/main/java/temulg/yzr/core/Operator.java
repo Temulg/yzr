@@ -26,12 +26,14 @@ public interface Operator {
 		void productsUpdated(Instant inst);
 	}
 
-	MarkPack newRequisites();
+	ReqPack newRequisites();
 
-	MarkPack newProducts();
+	ProdPack newProducts();
 
 	void apply(
-		Action act, MarkPack requisites, MarkPack products
+		Action act,
+		ReqPack.Storage requisites,
+		ProdPack.Storage products
 	);
 
 	default Entity entity() {

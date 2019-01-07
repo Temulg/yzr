@@ -47,24 +47,24 @@ public class OpGraph extends Entity {
 		g.edgeSet().forEach(edge -> {
 			var src = g.getEdgeSource(edge).op.entity().getEID();
 			var dst = g.getEdgeTarget(edge).op.entity().getEID();
-			imap.get(src).next.add(imap.get(dst));
+			imap.get(src).linkNext(
+				imap.get(dst), edge.prod, edge.req
+			);
 		});
 
 		return at;
 	}
 
 	public void Add(
-		Operator src_, PackSelector prodSel,
-		Operator dst_, PackSelector reqSel,
-		Mark m
+		Operator src_, ProdPack.Selector prodSel,
+		Operator dst_, ReqPack.Selector reqSel
 	) {
 		var src = getVertex(src_);
 		var dst = getVertex(dst_);
 
 		g.addEdge(src, dst, new Edge(
-			m,
-			prodSel.put(src.products, m),
-			reqSel.put(dst.requisites, m)
+			src.products.select(prodSel),
+			dst.requisites.select(reqSel)
 		));
 	}
 
@@ -79,8 +79,8 @@ public class OpGraph extends Entity {
 	static class Vertex {
 		private Vertex(Operator op_) {
 			op = op_;
-			products = op.newProducts();
 			requisites = op.newRequisites();
+			products = op.newProducts();
 		}
 
 		@Override
@@ -94,24 +94,25 @@ public class OpGraph extends Entity {
 		}
 
 		final Operator op;
-		final MarkPack products;
-		final MarkPack requisites;
+		final ReqPack requisites;
+		final ProdPack products;
 	}
 
 	static class Edge extends DefaultEdge {
-		private Edge(
-			Mark mark_, MarkPack.Ref prod_, MarkPack.Ref req_
-		) {
-			mark = mark_;
+		private Edge(ProdPack.Getter prod_, ReqPack.Setter req_) {
+			if (prod_ == null || req_ == null)
+				throw new IllegalArgumentException(
+					"Getter or setter is not valid"
+				);
+
 			prod = prod_;
 			req = req_;
 		}
 
 		private static final long serialVersionUID = 0x23426dfdf837eaaaL;
 
-		final transient Mark mark;
-		final transient MarkPack.Ref prod;
-		final transient MarkPack.Ref req;
+		final transient ProdPack.Getter prod;
+		final transient ReqPack.Setter req;
 	}
 
 	private final HashMap<UUID, Vertex> vertexMap = new HashMap<>();
